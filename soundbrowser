@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+
+import os, collections
+
+from PySide2 import QtCore
+from PySide2 import QtGui
+from PySide2 import QtWidgets
+from ui import soundbrowser
+
+#from just_playback import Playback
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gst', '1.0')
+from gi.repository import GObject, Gst, Gtk, GLib
+
+SHOW_HIDDEN = False
+SHOW_DIRS = False # TODO
+CACHE_SIZE=256
+
+class LRU(collections.OrderedDict):
+    'Limit size, evicting the least recently looked-up key when full'
+
+    def __init__(self, maxsize=128, /, *args, **kwds):
+        self.maxsize = maxsize
+        super().__init__(*args, **kwds)
+
+    def __getitem__(self, key):
+        value = super().__getitem__(key)
+        self.move_to_end(key)
+        return value
+
+    def __setitem__(self, key, value):
+        if key in self:
+            self.move_to_end(key)
+        super().__setitem__(key, value)
+        if len(self) > self.maxsize:
+            oldest = next(iter(self))
+            del self[oldest]
+
+def gst_bus_message_handler(bus, message, *user_data):
+    #print(f"bus = {bus}\nmessage = {message}\nuser_data = {user_data}")
+    # if message.get_structure():
+    #     print(f"type = {message.type} - {message.get_structure().to_string()}")
+    # else:
+    #     print(f"type = {message.type}")
+    if message.type in [ Gst.MessageType.STREAM_START, Gst.MessageType.TAG, Gst.MessageType.DURATION_CHANGED ]:
+        print(f"{message.type}: {message.get_structure().to_string()}")
+    elif message.type == Gst.MessageType.EOS:
+        print(f"{message.type}")
+    return True
+
+class Sound():
+
+    def __init__(self, path = None, stat_result = None):
+        self.path = path
+        self.stat_result = stat_result
+        #        self.playback = Playback(path)
+        self.player = Gst.ElementFactory.make('playbin')
+
+    def play(self):
+        #self.playback.play()
+        self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
+        self.player.set_property('uri', 'file://' + self.path)
+        self.player.set_state(Gst.State.PLAYING)
+
+class SoundPlayer():
+
+    def __init__(self):
+        self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
+        Gst.init(None)
+ 
+    def get(self, path):
+        if path in self._cache:
+            if not os.path.isfile(path):
+                del self._cache[path]
+                return None
+            sound = self._cache[path]
+            stat_result = os.stat(path)
+            if stat_result.st_mtime_ns > sound.stat_result.st_mtime_ns:
+                return self._load(path)
+            return sound
+        else:
+            return self._load(path)
+
+    def _load(self, path):
+        if not os.path.isfile(path):
+            return None
+        sound = Sound(path=path, stat_result=os.stat(path))
+        self._cache[path] = sound
+        return sound
+            
+class MyQFileSystemModel(QtWidgets.QFileSystemModel):
+    
+    def hasChildren(self, parent):
+        if self.flags(parent) & QtCore.Qt.ItemNeverHasChildren:
+            return False
+        try:
+            with os.scandir(self.filePath(parent)) as it:
+                for entry in it:
+                    if (not entry.name.startswith('.') or SHOW_HIDDEN) and entry.is_dir():
+                        return True
+        except PermissionError:
+            return False
+        return False
+
+class MyQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
+
+    def lessThan(self, left, right):
+        if left.column() not in [ 0, 2 ] or right.column() not in [ 0, 2 ]:
+            return super().lessThan(left, right)
+        info_left = self.sourceModel().fileInfo(left)
+        info_right =  self.sourceModel().fileInfo(right)
+        if info_left.isDir() and info_right.isFile():
+            return True
+        elif info_left.isFile() and info_right.isDir():
+            return False
+        return super().lessThan(left, right)
+
+class SoundBrowser(soundbrowser.Ui_MainWindow, QtWidgets.QMainWindow):
+
+    def __init__(self, maya=False):
+        super(SoundBrowser, self).__init__()
+        self.sound_player = SoundPlayer()
+        self.setupUi(self)
+        self.maya = maya
+        self.initial_path = '.'
+        self.populate()
+
+    def populate(self):
+        fs_model_filter = QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllDirs
+        dir_model_filter = QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllDirs | QtCore.QDir.Files
+        if SHOW_HIDDEN:
+            fs_model_filter |= QtCore.QDir.Hidden
+            dir_model_filter |= QtCore.QDir.Hidden
+
+        self.fs_model = MyQFileSystemModel(self)
+        self.fs_model.setFilter(fs_model_filter)
+        self.fs_model.setRootPath((QtCore.QDir.rootPath()))
+        self.dir_model = QtWidgets.QFileSystemModel(self)
+        self.dir_model.setFilter(dir_model_filter)
+        self.dir_model.setRootPath((QtCore.QDir.rootPath()))
+
+        self.treeView.setModel(self.fs_model)
+        self.dir_proxy_model = MyQSortFilterProxyModel(self)
+        self.dir_proxy_model.setSourceModel(self.dir_model)
+        self.tableView.setModel(self.dir_proxy_model)
+
+        self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
+        self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
+        self.tableView.verticalHeader().hide()
+        self.tableView.horizontalHeader().setSortIndicator(0, QtCore.Qt.AscendingOrder)
+        self.tableView.setSortingEnabled(True)
+        self.tableView.horizontalHeader().setStretchLastSection(True)
+        self.tableView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+
+        self.treeView.setColumnHidden(1, True)
+        self.treeView.setColumnHidden(2, True)
+        self.treeView.setColumnHidden(3, True)
+        self.treeView.selectionModel().selectionChanged.connect(self.treeview_selection_changed)
+        self.treeView.setRootIndex(self.fs_model.index('/'))
+        self.treeView.setCurrentIndex(self.fs_model.index(self.initial_path))
+        self.treeView.expand(self.fs_model.index(self.initial_path))
+        self.treeView.header().setSortIndicator(0,QtCore.Qt.AscendingOrder)
+        self.treeView.setSortingEnabled(True)
+        self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
+
+    def dir_model_directory_loaded(self, path):
+        self.tableView.resizeColumnToContents(0)
+
+    def treeview_selection_changed(self, selected, deselected):
+        path = self.fs_model.filePath(self.treeView.currentIndex())
+        self.locationBar.setText(path)
+        self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
+        self.treeView.setCurrentIndex(self.fs_model.index(path))
+        self.treeView.expand(self.fs_model.index(path))
+
+    def tableview_selection_changed(self, selected, deselected):
+        path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+        sound = self.sound_player.get(path)
+        if sound:
+            sound.play()
+
+if __name__ == '__main__':
+    app = QtWidgets.QApplication([])
+    fb = SoundBrowser()
+    fb.show()
+    app.exec_()
