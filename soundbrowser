@@ -56,11 +56,11 @@ class Sound():
         self.stat_result = stat_result
         #        self.playback = Playback(path)
         self.player = Gst.ElementFactory.make('playbin')
+        self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
+        self.player.set_property('uri', 'file://' + self.path)
 
     def play(self):
         #self.playback.play()
-        self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
-        self.player.set_property('uri', 'file://' + self.path)
         self.player.set_state(Gst.State.PLAYING)
 
 class SoundPlayer():
