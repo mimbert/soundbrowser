@@ -7,7 +7,6 @@ from PySide2 import QtGui
 from PySide2 import QtWidgets
 from ui import soundbrowser
 
-#from just_playback import Playback
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
@@ -54,7 +53,6 @@ class Sound():
     def __init__(self, path = None, stat_result = None):
         self.path = path
         self.stat_result = stat_result
-        #        self.playback = Playback(path)
         self.player = Gst.ElementFactory.make('playbin')
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
         self.player.set_property('uri', 'file://' + self.path)
