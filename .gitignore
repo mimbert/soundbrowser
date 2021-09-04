@@ -1,2 +1,4 @@
-ui/soundbrowser.py
+__pycache__
+soundbrowser_rc.py
+ui/main_win.py
 ui/__pycache__
