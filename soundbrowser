@@ -37,11 +37,6 @@ class LRU(collections.OrderedDict):
             del self[oldest]
 
 def gst_bus_message_handler(bus, message, *user_data):
-    #print(f"bus = {bus}\nmessage = {message}\nuser_data = {user_data}")
-    # if message.get_structure():
-    #     print(f"type = {message.type} - {message.get_structure().to_string()}")
-    # else:
-    #     print(f"type = {message.type}")
     if message.type in [ Gst.MessageType.STREAM_START, Gst.MessageType.TAG, Gst.MessageType.DURATION_CHANGED ]:
         print(f"{message.type}: {message.get_structure().to_string()}")
     elif message.type == Gst.MessageType.EOS:
