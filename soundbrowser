@@ -5,7 +5,7 @@ import os, collections
 from PySide2 import QtCore
 from PySide2 import QtGui
 from PySide2 import QtWidgets
-from ui import soundbrowser
+from ui import main_win
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -112,7 +112,7 @@ class MyQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
             return False
         return super().lessThan(left, right)
 
-class SoundBrowser(soundbrowser.Ui_MainWindow, QtWidgets.QMainWindow):
+class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def __init__(self, maya=False):
         super(SoundBrowser, self).__init__()

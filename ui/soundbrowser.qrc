@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>applications-system-symbolic.symbolic.png</file>
+  </qresource>
+</RCC>
