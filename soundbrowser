@@ -53,7 +53,6 @@ class Sound():
         self.player.set_property('uri', 'file://' + self.path)
 
     def play(self):
-        #self.playback.play()
         self.player.set_state(Gst.State.PLAYING)
 
     def stop(self):
