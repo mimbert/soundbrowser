@@ -56,6 +56,10 @@ class Sound():
         #self.playback.play()
         self.player.set_state(Gst.State.PLAYING)
 
+    def stop(self):
+        self.player.set_state(Gst.State.PAUSED)
+        self.player.seek_simple (Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
+
 class SoundPlayer():
 
     def __init__(self):
@@ -114,6 +118,8 @@ class SoundBrowser(soundbrowser.Ui_MainWindow, QtWidgets.QMainWindow):
     def __init__(self, maya=False):
         super(SoundBrowser, self).__init__()
         self.sound_player = SoundPlayer()
+        # self.play_queue = collections.OrderedDict() # keys: file pathes. Values: Sound
+        # not used yet but might be usefull when we desactivate  self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.setupUi(self)
         self.maya = maya
         self.initial_path = '.'
@@ -138,6 +144,7 @@ class SoundBrowser(soundbrowser.Ui_MainWindow, QtWidgets.QMainWindow):
         self.dir_proxy_model.setSourceModel(self.dir_model)
         self.tableView.setModel(self.dir_proxy_model)
 
+        self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
         self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
         self.tableView.verticalHeader().hide()
@@ -169,10 +176,21 @@ class SoundBrowser(soundbrowser.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.expand(self.fs_model.index(path))
 
     def tableview_selection_changed(self, selected, deselected):
-        path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+        for range_func in [ (deselected, self.remove_from_play_queue), (selected, self.add_to_play_queue) ]:
+            for r in range_func[0]:
+                for pmi in r.indexes():
+                    path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
+                    range_func[1](path)
+
+    def add_to_play_queue(self, path):
         sound = self.sound_player.get(path)
         if sound:
             sound.play()
+
+    def remove_from_play_queue(self, path):
+        sound = self.sound_player.get(path)
+        if sound:
+            sound.stop()
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication([])
