@@ -70,6 +70,11 @@ class LRU(collections.OrderedDict):
             del self[oldest]
 
 def gst_bus_message_handler(bus, message, *user_data):
+    sound = user_data[0]
+    if message.type == Gst.MessageType.EOS and sound.browser.config['play_looped']:
+        sound.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
+        sound.player.set_state(Gst.State.PLAYING)
+        return True
     if message.type in [ Gst.MessageType.STREAM_START, Gst.MessageType.TAG, Gst.MessageType.DURATION_CHANGED ]:
         print(f"{message.type}: {message.get_structure().to_string()}")
     elif message.type == Gst.MessageType.EOS:
@@ -78,9 +83,10 @@ def gst_bus_message_handler(bus, message, *user_data):
 
 class Sound():
 
-    def __init__(self, path = None, stat_result = None):
+    def __init__(self, path = None, stat_result = None, browser = None):
         self.path = path
         self.stat_result = stat_result
+        self.browser = browser
         self.player = Gst.ElementFactory.make('playbin')
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
         uri = pathlib.Path(path).as_uri()
@@ -95,8 +101,9 @@ class Sound():
 
 class SoundPlayer():
 
-    def __init__(self):
+    def __init__(self, browser):
         self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
+        self._browser = browser
         Gst.init(None)
 
     def get(self, path):
@@ -115,7 +122,7 @@ class SoundPlayer():
     def _load(self, path):
         if not os.path.isfile(path):
             return None
-        sound = Sound(path=path, stat_result=os.stat(path))
+        sound = Sound(path=path, stat_result=os.stat(path), browser=self._browser)
         self._cache[path] = sound
         return sound
 
@@ -170,7 +177,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = load_conf(CONF_FILE)
-        self.sound_player = SoundPlayer()
+        self.sound_player = SoundPlayer(self)
         self.setupUi(self)
         self.populate()
 
