@@ -1,6 +1,6 @@
-all: ui/main_win.py
+all: ui/main_win.py ui/prefs_dial.py
 
-ui/main_win.py: ui/main_win.ui soundbrowser_rc.py
+ui/%.py: ui/%.ui soundbrowser_rc.py
 	qtchooser -run-tool=uic -qt=5 $< -g python > $@
 
 soundbrowser_rc.py: ui/soundbrowser.qrc

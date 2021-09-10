@@ -1,5 +1,7 @@
 <RCC>
+  <qresource prefix="icons"/>
   <qresource prefix="icons">
-    <file>applications-system-symbolic.symbolic.png</file>
+    <file>appicon.png</file>
+    <file>settings.png</file>
   </qresource>
 </RCC>

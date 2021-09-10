@@ -1,20 +1,53 @@
 #!/usr/bin/env python3
 
-import os, collections
+import os, os.path, collections, yaml, schema, signal, sys, pathlib
 
 from PySide2 import QtCore
 from PySide2 import QtGui
 from PySide2 import QtWidgets
-from ui import main_win
+from ui import main_win, prefs_dial
 
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst, Gtk, GLib
 
-SHOW_HIDDEN = False
-SHOW_DIRS = False # TODO
-CACHE_SIZE=256
+CACHE_SIZE = 256
+CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
+
+STARTUP_DIR_MODE_SPECIFIED_DIR = 1
+STARTUP_DIR_MODE_LAST_DIR = 2
+STARTUP_DIR_MODE_CURRENT_DIR = 3
+STARTUP_DIR_MODE_HOME_DIR = 4
+
+conf_schema = schema.Schema({
+    schema.Optional('startup_dir_mode', default=STARTUP_DIR_MODE_HOME_DIR): int,
+    schema.Optional('specified_dir', default=os.path.expanduser('~')): str,
+    schema.Optional('last_dir', default=os.path.expanduser('~')): str,
+    schema.Optional('show_hidden_files', default=False): bool,
+    schema.Optional('show_metadata_pane', default=True): bool,
+    schema.Optional('show_parent_folder_in_file_pane', default=True): bool,
+    schema.Optional('main_window_geometry', default=None): bytes,
+    schema.Optional('main_window_state', default=None): bytes,
+    schema.Optional('splitter_state', default=None): bytes,
+    schema.Optional('play_looped', default=False): bool,
+})
+
+def load_conf(path):
+    try:
+        with open(path) as fh:
+            conf = yaml.safe_load(fh)
+    except OSError:
+        conf = {}
+    return conf_schema.validate(conf)
+
+def save_conf(path, conf):
+    conf = conf_schema.validate(conf)
+    try:
+        with open(path, 'w') as fh:
+            yaml.dump(conf, fh)
+    except OSError:
+        pass
 
 class LRU(collections.OrderedDict):
     'Limit size, evicting the least recently looked-up key when full'
@@ -50,21 +83,22 @@ class Sound():
         self.stat_result = stat_result
         self.player = Gst.ElementFactory.make('playbin')
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
-        self.player.set_property('uri', 'file://' + self.path)
+        uri = pathlib.Path(path).as_uri()
+        self.player.set_property('uri', uri)
 
     def play(self):
         self.player.set_state(Gst.State.PLAYING)
 
     def stop(self):
         self.player.set_state(Gst.State.PAUSED)
-        self.player.seek_simple (Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
+        self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
 
 class SoundPlayer():
 
     def __init__(self):
         self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
         Gst.init(None)
- 
+
     def get(self, path):
         if path in self._cache:
             if not os.path.isfile(path):
@@ -84,16 +118,20 @@ class SoundPlayer():
         sound = Sound(path=path, stat_result=os.stat(path))
         self._cache[path] = sound
         return sound
-            
+
 class MyQFileSystemModel(QtWidgets.QFileSystemModel):
-    
+
+    def __init__(self, show_hidden_files, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self.show_hidden_files = show_hidden_files
+
     def hasChildren(self, parent):
         if self.flags(parent) & QtCore.Qt.ItemNeverHasChildren:
             return False
         try:
             with os.scandir(self.filePath(parent)) as it:
                 for entry in it:
-                    if (not entry.name.startswith('.') or SHOW_HIDDEN) and entry.is_dir():
+                    if (not entry.name.startswith('.') or self.show_hidden_files) and entry.is_dir():
                         return True
         except PermissionError:
             return False
@@ -112,57 +150,111 @@ class MyQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
             return False
         return super().lessThan(left, right)
 
-class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
+class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
-    def __init__(self, maya=False):
-        super(SoundBrowser, self).__init__()
-        self.sound_player = SoundPlayer()
-        # self.play_queue = collections.OrderedDict() # keys: file pathes. Values: Sound
-        # not used yet but might be usefull when we desactivate  self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+    def __init__(self, /, *args, **kwds):
+        super(PrefsDialog, self).__init__(*args, **kwds)
         self.setupUi(self)
-        self.maya = maya
-        self.initial_path = '.'
         self.populate()
 
     def populate(self):
+        self.specified_dir_button.clicked.connect(self.specified_dir_button_clicked)
+
+    def specified_dir_button_clicked(self, checked = False):
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, "startup directory", self.specified_dir.text())
+        if path:
+            self.specified_dir.setText(path)
+
+class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+        self.config = load_conf(CONF_FILE)
+        self.sound_player = SoundPlayer()
+        self.setupUi(self)
+        self.populate()
+
+    def clean_close(self):
+        self.config['main_window_geometry'] = self.saveGeometry().data()
+        self.config['main_window_state'] = self.saveState().data()
+        self.config['splitter_state'] = self.splitter.saveState().data()
+        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
+            self.config['last_dir'] = self.fs_model.filePath(self.treeView.currentIndex())
+        save_conf(CONF_FILE, self.config)
+
+    def closeEvent(self, event):
+        self.clean_close()
+        event.accept()
+
+    def refresh_config(self):
+        self.fs_model.show_hidden_files = self.config['show_hidden_files']
         fs_model_filter = QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllDirs
-        dir_model_filter = QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllDirs | QtCore.QDir.Files
-        if SHOW_HIDDEN:
+        dir_model_filter = QtCore.QDir.Files | QtCore.QDir.AllDirs
+        if self.config['show_hidden_files']:
             fs_model_filter |= QtCore.QDir.Hidden
             dir_model_filter |= QtCore.QDir.Hidden
-
-        self.fs_model = MyQFileSystemModel(self)
+        if self.config['show_parent_folder_in_file_pane']:
+            dir_model_filter |= QtCore.QDir.NoDot
+        else:
+            dir_model_filter |= QtCore.QDir.NoDotAndDotDot
         self.fs_model.setFilter(fs_model_filter)
+        self.dir_model.setFilter(dir_model_filter)
+        if self.config['show_metadata_pane']:
+            self.metadata.show()
+        else:
+            self.metadata.hide()
+
+    def populate(self):
+        self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
         self.fs_model.setRootPath((QtCore.QDir.rootPath()))
         self.dir_model = QtWidgets.QFileSystemModel(self)
-        self.dir_model.setFilter(dir_model_filter)
         self.dir_model.setRootPath((QtCore.QDir.rootPath()))
-
         self.treeView.setModel(self.fs_model)
         self.dir_proxy_model = MyQSortFilterProxyModel(self)
         self.dir_proxy_model.setSourceModel(self.dir_model)
         self.tableView.setModel(self.dir_proxy_model)
-
         self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
+        self.tableView.clicked.connect(self.tableview_clicked)
         self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
         self.tableView.verticalHeader().hide()
         self.tableView.horizontalHeader().setSortIndicator(0, QtCore.Qt.AscendingOrder)
         self.tableView.setSortingEnabled(True)
         self.tableView.horizontalHeader().setStretchLastSection(True)
         self.tableView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
-
         self.treeView.setColumnHidden(1, True)
         self.treeView.setColumnHidden(2, True)
         self.treeView.setColumnHidden(3, True)
         self.treeView.selectionModel().selectionChanged.connect(self.treeview_selection_changed)
         self.treeView.setRootIndex(self.fs_model.index('/'))
-        self.treeView.setCurrentIndex(self.fs_model.index(self.initial_path))
-        self.treeView.expand(self.fs_model.index(self.initial_path))
+        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
+            startup_dir = self.config['specified_dir']
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
+            startup_dir = self.config['last_dir']
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
+            startup_dir = os.getcwd()
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
+            startup_dir = os.path.expanduser('~')
+        self.treeView.setCurrentIndex(self.fs_model.index(startup_dir))
+        self.treeView.expand(self.fs_model.index(startup_dir))
         self.treeView.header().setSortIndicator(0,QtCore.Qt.AscendingOrder)
         self.treeView.setSortingEnabled(True)
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
+        self.prefsButton.clicked.connect(self.prefs_button_clicked)
+        self.loop.setChecked(self.config['play_looped'])
+        self.show_hidden_files.setChecked(self.config['show_hidden_files'])
+        self.show_metadata_pane.setChecked(self.config['show_metadata_pane'])
+        self.loop.clicked.connect(self.loop_clicked)
+        self.show_hidden_files.clicked.connect(self.show_hidden_files_clicked)
+        self.show_metadata_pane.clicked.connect(self.show_metadata_pane_clicked)
+        self.refresh_config()
+        if self.config['main_window_geometry']:
+            self.restoreGeometry(QtCore.QByteArray(self.config['main_window_geometry']))
+        if self.config['main_window_state']:
+            self.restoreState(QtCore.QByteArray(self.config['main_window_state']))
+        if self.config['splitter_state']:
+            self.splitter.restoreState(QtCore.QByteArray(self.config['splitter_state']))
 
     def dir_model_directory_loaded(self, path):
         self.tableView.resizeColumnToContents(0)
@@ -175,11 +267,28 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.expand(self.fs_model.index(path))
 
     def tableview_selection_changed(self, selected, deselected):
-        for range_func in [ (deselected, self.remove_from_play_queue), (selected, self.add_to_play_queue) ]:
-            for r in range_func[0]:
+        for r in deselected:
+            for pmi in r.indexes():
+                path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
+                self.remove_from_play_queue(path)
+
+    def tableview_clicked(self, index):
+        fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
+        if fi.isDir():
+            path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
+            self.locationBar.setText(path)
+            self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
+            self.treeView.setCurrentIndex(self.fs_model.index(path))
+            self.treeView.expand(self.fs_model.index(path))
+        else:
+            for r in self.tableView.selectionModel().selection():
                 for pmi in r.indexes():
                     path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
-                    range_func[1](path)
+                    print(f"stop {path}")
+                    self.remove_from_play_queue(path)
+            path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
+            self.add_to_play_queue(path)
+            self.locationBar.setText(path)
 
     def add_to_play_queue(self, path):
         sound = self.sound_player.get(path)
@@ -191,8 +300,51 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if sound:
             sound.stop()
 
+    def loop_clicked(self, checked = False):
+        self.config['play_looped'] = checked
+
+    def show_hidden_files_clicked(self, checked = False):
+        self.config['show_hidden_files'] = checked
+        self.refresh_config()
+
+    def show_metadata_pane_clicked(self, checked = False):
+        self.config['show_metadata_pane'] = checked
+        self.refresh_config()
+
+    def prefs_button_clicked(self, checked = False):
+        prefs = PrefsDialog(self)
+        #prefs.show_hidden_files.setChecked(self.config['show_hidden_files'])
+        prefs.specified_dir.setText(self.config['specified_dir'])
+        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
+            prefs.startup_dir_mode_specified_dir.setChecked(True)
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
+            prefs.startup_dir_mode_last_dir.setChecked(True)
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
+            prefs.startup_dir_mode_current_dir.setChecked(True)
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
+            prefs.startup_dir_mode_home_dir.setChecked(True)
+        if prefs.exec_():
+            #self.config['show_hidden_files'] = prefs.show_hidden_files.isChecked()
+            if prefs.startup_dir_mode_specified_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_SPECIFIED_DIR
+            elif prefs.startup_dir_mode_last_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_LAST_DIR
+            elif prefs.startup_dir_mode_current_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_CURRENT_DIR
+            elif prefs.startup_dir_mode_home_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_HOME_DIR
+            self.config['specified_dir'] = prefs.specified_dir.text()
+            self.refresh_config()
+
 if __name__ == '__main__':
     app = QtWidgets.QApplication([])
-    fb = SoundBrowser()
-    fb.show()
-    app.exec_()
+    sb = SoundBrowser()
+    def signal_handler(sig, frame):
+        sb.clean_close()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+    timer = QtCore.QTimer()
+    timer.start(500)
+    timer.timeout.connect(lambda: None)
+    sb.show()
+    sys.exit(app.exec_())
