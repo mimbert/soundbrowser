@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, os.path, collections, yaml, schema, signal, sys, pathlib
+import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading
 
 from PySide2 import QtCore
 from PySide2 import QtGui
@@ -52,7 +52,7 @@ def save_conf(path, conf):
 class LRU(collections.OrderedDict):
     'Limit size, evicting the least recently looked-up key when full'
 
-    def __init__(self, maxsize=128, /, *args, **kwds):
+    def __init__(self, maxsize=128, *args, **kwds):
         self.maxsize = maxsize
         super().__init__(*args, **kwds)
 
@@ -71,19 +71,81 @@ class LRU(collections.OrderedDict):
 
 def gst_bus_message_handler(bus, message, *user_data):
     sound = user_data[0]
-    if message.type == Gst.MessageType.EOS and sound.browser.config['play_looped']:
-        sound.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
-        sound.player.set_state(Gst.State.PLAYING)
-        return True
-    if message.type in [ Gst.MessageType.STREAM_START, Gst.MessageType.TAG, Gst.MessageType.DURATION_CHANGED ]:
-        print(f"{message.type}: {message.get_structure().to_string()}")
-    elif message.type == Gst.MessageType.EOS:
-        print(f"{message.type}")
+    sound.gst_message.emit(message)
     return True
 
-class Sound():
+def parse_tag_list(taglist):
+    tmp = {}
+    containers = {}
+    for i in range(taglist.n_tags()):
+        tag = taglist.nth_tag_name(i)
+        if tag in [ 'title', 'artist', 'album', 'genre', 'musical-key', 'album-artist', 'encoder', 'channel-mode', 'audio-codec', 'container-format', 'comment' ]:
+            value = taglist.get_string(tag)
+        elif tag in [ 'track-count', 'track-number', 'minimum-bitrate', 'maximum-bitrate', 'bitrate' ]:
+            value = taglist.get_uint(tag)
+        elif tag == 'duration':
+            value = taglist.get_uint64(tag)
+        elif tag in [  'beats-per-minute', 'replaygain-track-gain', 'replaygain-album-gain', 'replaygain-track-peak', 'replaygain-album-peak' ]:
+            value = taglist.get_double(tag)
+        elif tag == 'datetime':
+            value = taglist.get_date_time(tag)
+            if value[0]:
+                value = (True, value[1].to_iso8601_string())
+            else:
+                value = taglist.get_date(tag)
+                if value[0]:
+                    value = (True, value[1].to_struct_tm()) # never tested, need to find an example stream
+        elif tag == 'has-crc':
+            value = taglist.get_boolean(tag)
+        elif tag == 'image':
+            # not handled (yet?)
+            continue
+        if value[0]:
+            if tag == 'container-format':
+                containers[value[1]] = tmp
+                tmp = {}
+            else:
+                tmp[tag] = value[1]
+    if len(tmp) > 0:
+        containers[None] = tmp
+        tmp = {}
+    return containers
+
+def get_milliseconds_suffix(secs):
+    ms_suffix = ""
+    msecs = int (round(secs - int(secs), 3) * 1000)
+    if msecs != 0:
+        ms_suffix = ".%03i" % msecs
+    return ms_suffix
+
+def format_duration(nsecs):
+    if nsecs == None:
+        return ''
+    secs = nsecs / 1e9
+    formatted_duration = ""
+    if secs < 0:
+        secs = -secs
+        formatted_duration += "-"
+    s = secs
+    d = (s - (s % 86400)) // 86400
+    s -= d * 86400
+    h = (s - (s % 3600)) // 3600
+    s -= h * 3600
+    m = (s - (s % 60)) // 60
+    s -= m * 60
+    if secs >= 86400: formatted_duration += "%id" % d
+    if secs >= 3600: formatted_duration += "%ih" % h
+    if secs >= 60: formatted_duration += "%im" % m
+    formatted_duration += "%i%ss" % (s, get_milliseconds_suffix(s))
+    return formatted_duration
+
+class Sound(QtCore.QObject):
+
+    gst_message = QtCore.Signal(Gst.Message)
 
     def __init__(self, path = None, stat_result = None, browser = None):
+        super().__init__()
+        self.metadata = { None: {}, 'all': {} }
         self.path = path
         self.stat_result = stat_result
         self.browser = browser
@@ -91,19 +153,112 @@ class Sound():
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
         uri = pathlib.Path(path).as_uri()
         self.player.set_property('uri', uri)
+        self.seek_pos_update_timer = QtCore.QTimer()
+        self.gst_message.connect(self.receive_gst_message)
+
+    def update_metadata(self, metadata):
+        for k in metadata:
+            if not k in self.metadata:
+                self.metadata[k] = {}
+            self.metadata[k].update(metadata[k])
+            self.metadata['all'].update(metadata[k])
+
+    def update_metadata_field(self, field, value, force = None):
+        f = getattr(self.browser, field)
+        l = getattr(self.browser, field + '_label')
+        if value or force == True:
+            f.setText(str(value))
+            f.setEnabled(True)
+            l.setEnabled(True)
+        if not value or force == False:
+            f.setText(str(value))
+            f.setEnabled(False)
+            l.setEnabled(False)
+
+    def update_metadata_pane(self):
+        m = self.metadata['all']
+        b = self.browser
+        self.update_metadata_field('title', m.get('title', ''))
+        self.update_metadata_field('artist', m.get('artist', ''))
+        self.update_metadata_field('album', m.get('album', ''))
+        self.update_metadata_field('album_artist', m.get('album-artist', ''))
+        self.update_metadata_field('track', str(m.get('track-number', '?')) + '/' + str(m.get('track-count', '?')),
+                                   True if ('track-number' in m or 'track-count' in m) else False)
+        self.update_metadata_field('duration', format_duration(m.get('duration')))
+        self.update_metadata_field('genre', m.get('genre', ''))
+        self.update_metadata_field('date', m.get('datetime', ''))
+        self.update_metadata_field('bpm', f"{m['beats-per-minute']:.2f}" if 'beats-per-minute' in m else '')
+        self.update_metadata_field('key', m.get('musical-key', ''))
+        self.update_metadata_field('channel_mode', m.get('channel-mode', ''))
+        self.update_metadata_field('audio_codec', m.get('audio-codec', ''))
+        self.update_metadata_field('encoder', m.get('encoder', ''))
+        self.update_metadata_field('bitrate', str(m.get('bitrate', '?')) + ' (min=' + str(m.get('minimum-bitrate', '?')) + '/max=' + str(m.get('maximum-bitrate', '?')) + ')',
+                                   True if 'bitrate' in m else False)
+        self.update_metadata_field('comment', m.get('comment', ''))
+
+    @QtCore.Slot(Gst.Message)
+    def receive_gst_message(self, message):
+        #print(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
+        if message.type == Gst.MessageType.STREAM_START:
+            self.browser.play.setEnabled(False)
+            self.browser.pause.setEnabled(True)
+            self.browser.stop.setEnabled(True)
+        elif message.type == Gst.MessageType.EOS:
+            if self.browser.config['play_looped']:
+                self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
+                self.player.set_state(Gst.State.PLAYING)
+            else:
+                self.seek_pos_update_timer.stop()
+                self.browser.play.setEnabled(True)
+                self.browser.pause.setEnabled(False)
+                self.browser.stop.setEnabled(False)
+        elif message.type == Gst.MessageType.TAG:
+            #print(f"{message.type}: {message.get_structure().to_string()}")
+            message_struct = message.get_structure()
+            taglist = message.parse_tag()
+            metadata = parse_tag_list(taglist)
+            self.update_metadata(metadata)
+            self.update_metadata_pane()
+        elif message.type == Gst.MessageType.WARNING:
+            print(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
+        elif message.type == Gst.MessageType.ERROR:
+            print(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+
+    @QtCore.Slot()
+    def seek_position_updater(self):
+        got_duration, duration = self.player.query_duration(Gst.Format.TIME)
+        got_position, position = self.player.query_position(Gst.Format.TIME)
+        if got_duration:
+            if 'duration' not in self.metadata[None] or 'duration' not in self.metadata['all']:
+                self.metadata[None]['duration'] = self.metadata['all']['duration'] = duration
+                self.update_metadata_pane()
+            if got_position:
+                signals_blocked = self.browser.seek.blockSignals(True)
+                self.browser.seek.setValue(position * 100.0 / duration)
+                self.browser.seek.blockSignals(signals_blocked)
 
     def play(self):
         self.player.set_state(Gst.State.PLAYING)
+        self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
+        self.seek_pos_update_timer.start(50)
 
     def stop(self):
+        self.seek_pos_update_timer.stop()
         self.player.set_state(Gst.State.PAUSED)
         self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
+
+    def seek(self, position):
+        got_duration, duration = self.player.query_duration(Gst.Format.TIME)
+        if got_duration:
+            seek_pos = position * duration / 100.0
+            self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, seek_pos)
 
 class SoundPlayer():
 
     def __init__(self, browser):
         self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
         self._browser = browser
+        self._currently_playing = None
         Gst.init(None)
 
     def get(self, path):
@@ -125,6 +280,21 @@ class SoundPlayer():
         sound = Sound(path=path, stat_result=os.stat(path), browser=self._browser)
         self._cache[path] = sound
         return sound
+
+    def add_to_play_queue(self, path):
+        sound = self.get(path)
+        if sound:
+            self._currently_playing = sound
+            sound.play()
+            #sound.update_metadata_pane()
+
+    def remove_from_play_queue(self, path):
+        sound = self.get(path)
+        if sound:
+            sound.stop()
+
+    def currently_playing(self):
+        return self._currently_playing
 
 class MyQFileSystemModel(QtWidgets.QFileSystemModel):
 
@@ -159,7 +329,7 @@ class MyQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 
 class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
-    def __init__(self, /, *args, **kwds):
+    def __init__(self, *args, **kwds):
         super(PrefsDialog, self).__init__(*args, **kwds)
         self.setupUi(self)
         self.populate()
@@ -172,12 +342,14 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         if path:
             self.specified_dir.setText(path)
 
+
 class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
-    def __init__(self):
+    def __init__(self, clipboard):
         super().__init__()
+        self.clipboard = clipboard
         self.config = load_conf(CONF_FILE)
-        self.sound_player = SoundPlayer(self)
+        self.player = SoundPlayer(self)
         self.setupUi(self)
         self.populate()
 
@@ -221,6 +393,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.dir_proxy_model.setSourceModel(self.dir_model)
         self.tableView.setModel(self.dir_proxy_model)
         self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
         self.tableView.clicked.connect(self.tableview_clicked)
         self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
@@ -249,12 +422,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
         self.prefsButton.clicked.connect(self.prefs_button_clicked)
+        self.seek.valueChanged.connect(self.slider_value_changed)
         self.loop.setChecked(self.config['play_looped'])
         self.show_hidden_files.setChecked(self.config['show_hidden_files'])
         self.show_metadata_pane.setChecked(self.config['show_metadata_pane'])
         self.loop.clicked.connect(self.loop_clicked)
         self.show_hidden_files.clicked.connect(self.show_hidden_files_clicked)
         self.show_metadata_pane.clicked.connect(self.show_metadata_pane_clicked)
+        self.copy_path.clicked.connect(self.copy_path_clicked)
         self.refresh_config()
         if self.config['main_window_geometry']:
             self.restoreGeometry(QtCore.QByteArray(self.config['main_window_geometry']))
@@ -277,7 +452,12 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         for r in deselected:
             for pmi in r.indexes():
                 path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
-                self.remove_from_play_queue(path)
+                self.player.remove_from_play_queue(path)
+        path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+        self.player.add_to_play_queue(path)
+        self.locationBar.setText(path)
+        sound = self.player.get(path)
+        if sound: sound.update_metadata_pane()
 
     def tableview_clicked(self, index):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
@@ -291,21 +471,12 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             for r in self.tableView.selectionModel().selection():
                 for pmi in r.indexes():
                     path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
-                    print(f"stop {path}")
-                    self.remove_from_play_queue(path)
+                    self.player.remove_from_play_queue(path)
             path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
-            self.add_to_play_queue(path)
+            self.player.add_to_play_queue(path)
             self.locationBar.setText(path)
-
-    def add_to_play_queue(self, path):
-        sound = self.sound_player.get(path)
-        if sound:
-            sound.play()
-
-    def remove_from_play_queue(self, path):
-        sound = self.sound_player.get(path)
-        if sound:
-            sound.stop()
+            sound = self.player.get(path)
+            if sound: sound.update_metadata_pane()
 
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
@@ -343,15 +514,25 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.config['specified_dir'] = prefs.specified_dir.text()
             self.refresh_config()
 
+    def copy_path_clicked(self, checked = False):
+        self.locationBar.setSelection(0, len(self.locationBar.text()))
+        self.clipboard.setText(self.locationBar.text())
+
+    def slider_value_changed(self, position):
+        sound = self.player.currently_playing()
+        if sound:
+            sound.seek(position)
+        else:
+            signals_blocked = self.seek.blockSignals(True)
+            self.seek.setValue(0)
+            self.seek.blockSignals(signals_blocked)
+
 if __name__ == '__main__':
     app = QtWidgets.QApplication([])
-    sb = SoundBrowser()
+    sb = SoundBrowser(app.clipboard())
     def signal_handler(sig, frame):
         sb.clean_close()
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
-    timer = QtCore.QTimer()
-    timer.start(500)
-    timer.timeout.connect(lambda: None)
     sb.show()
     sys.exit(app.exec_())
