@@ -99,8 +99,14 @@ def parse_tag_list(taglist):
         elif tag == 'has-crc':
             value = taglist.get_boolean(tag)
         elif tag == 'image':
-            # not handled (yet?)
-            continue
+            value = taglist.get_sample(tag)
+            memmap = value[1].get_buffer().get_all_memory().map(Gst.MapFlags.READ)
+            bytearr = QtCore.QByteArray(memmap.data.tobytes())
+            img = QtGui.QImage()
+            img.loadFromData(bytearr)
+            img = QtGui.QPixmap(img)
+            print(f"img = {img}")
+            value = (True, img)
         if value and value[0]:
             if tag == 'container-format':
                 containers[value[1]] = tmp
@@ -196,6 +202,10 @@ class Sound(QtCore.QObject):
         self.update_metadata_field('bitrate', str(m.get('bitrate', '?')) + ' (min=' + str(m.get('minimum-bitrate', '?')) + '/max=' + str(m.get('maximum-bitrate', '?')) + ')',
                                    True if 'bitrate' in m else False)
         self.update_metadata_field('comment', m.get('comment', ''))
+        if m.get('image'):
+            self.browser.image.setPixmap(m.get('image'))
+        else:
+            self.browser.image.setPixmap(None)
 
     @QtCore.Slot(Gst.Message)
     def receive_gst_message(self, message):
@@ -422,6 +432,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.restoreState(QtCore.QByteArray(self.config['main_window_state']))
         if self.config['splitter_state']:
             self.splitter.restoreState(QtCore.QByteArray(self.config['splitter_state']))
+        self.image.setScaledContents(True)
+
+    def showEvent(self, event):
+        self.image.setFixedWidth(self.metadata.height())
+        self.image.setFixedHeight(self.metadata.height())
 
     def dir_model_directory_loaded(self, path):
         self.tableView.resizeColumnToContents(0)
