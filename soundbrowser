@@ -79,6 +79,7 @@ def parse_tag_list(taglist):
     containers = {}
     for i in range(taglist.n_tags()):
         tag = taglist.nth_tag_name(i)
+        value = None
         if tag in [ 'title', 'artist', 'album', 'genre', 'musical-key', 'album-artist', 'encoder', 'channel-mode', 'audio-codec', 'container-format', 'comment' ]:
             value = taglist.get_string(tag)
         elif tag in [ 'track-count', 'track-number', 'minimum-bitrate', 'maximum-bitrate', 'bitrate' ]:
@@ -100,7 +101,7 @@ def parse_tag_list(taglist):
         elif tag == 'image':
             # not handled (yet?)
             continue
-        if value[0]:
+        if value and value[0]:
             if tag == 'container-format':
                 containers[value[1]] = tmp
                 tmp = {}
