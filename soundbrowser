@@ -254,7 +254,7 @@ class Sound(QtCore.QObject):
             seek_pos = position * duration / 100.0
             self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, seek_pos)
 
-class SoundPlayer():
+class SoundManager():
 
     def __init__(self, browser):
         self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
@@ -350,7 +350,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         super().__init__()
         self.clipboard = clipboard
         self.config = load_conf(CONF_FILE)
-        self.player = SoundPlayer(self)
+        self.manager = SoundManager(self)
         self.setupUi(self)
         self.populate()
 
