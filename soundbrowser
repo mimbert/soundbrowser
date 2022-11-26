@@ -201,18 +201,14 @@ class Sound(QtCore.QObject):
     def receive_gst_message(self, message):
         #print(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
         if message.type == Gst.MessageType.STREAM_START:
-            self.browser.play.setEnabled(False)
-            self.browser.pause.setEnabled(True)
-            self.browser.stop.setEnabled(True)
+            pass
         elif message.type == Gst.MessageType.EOS:
             if self.browser.config['play_looped']:
                 self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
                 self.player.set_state(Gst.State.PLAYING)
             else:
                 self.seek_pos_update_timer.stop()
-                self.browser.play.setEnabled(True)
-                self.browser.pause.setEnabled(False)
-                self.browser.stop.setEnabled(False)
+                self.browser.notify_sound_stop(self)
         elif message.type == Gst.MessageType.TAG:
             #print(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
@@ -259,7 +255,6 @@ class SoundManager():
     def __init__(self, browser):
         self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
         self._browser = browser
-        self._currently_playing = None
         Gst.init(None)
 
     def get(self, path):
@@ -281,21 +276,6 @@ class SoundManager():
         sound = Sound(path=path, stat_result=os.stat(path), browser=self._browser)
         self._cache[path] = sound
         return sound
-
-    def add_to_play_queue(self, path):
-        sound = self.get(path)
-        if sound:
-            self._currently_playing = sound
-            sound.play()
-            #sound.update_metadata_pane()
-
-    def remove_from_play_queue(self, path):
-        sound = self.get(path)
-        if sound:
-            sound.stop()
-
-    def currently_playing(self):
-        return self._currently_playing
 
 class MyQFileSystemModel(QtWidgets.QFileSystemModel):
 
@@ -351,6 +331,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clipboard = clipboard
         self.config = load_conf(CONF_FILE)
         self.manager = SoundManager(self)
+        self.currently_playing = None
         self.setupUi(self)
         self.populate()
 
@@ -431,6 +412,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.show_hidden_files.clicked.connect(self.show_hidden_files_clicked)
         self.show_metadata_pane.clicked.connect(self.show_metadata_pane_clicked)
         self.copy_path.clicked.connect(self.copy_path_clicked)
+        self.play.clicked.connect(self.play_clicked)
+        self.pause.clicked.connect(self.pause_clicked)
+        self.stop.clicked.connect(self.stop_clicked)
         self.refresh_config()
         if self.config['main_window_geometry']:
             self.restoreGeometry(QtCore.QByteArray(self.config['main_window_geometry']))
@@ -449,21 +433,61 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setCurrentIndex(self.fs_model.index(path))
         self.treeView.expand(self.fs_model.index(path))
 
+    def notify_sound_stop(self, sound):
+        self.play.setEnabled(True)
+        self.pause.setEnabled(False)
+        self.stop.setEnabled(False)
+
+    def stop_sound(self, path):
+        sound = self.manager.get(path)
+        if sound:
+            sound.stop()
+            if sound == self.currently_playing:
+                self.currently_playing = None
+                self.notify_sound_stop(sound)
+
+    def start_sound(self, path):
+        sound = self.manager.get(path)
+        if sound:
+            sound.play()
+            self.locationBar.setText(path)
+            sound.update_metadata_pane()
+            self.currently_playing = sound
+            self.play.setEnabled(False)
+            self.pause.setEnabled(True)
+            self.stop.setEnabled(True)
+
+    def play_clicked(self, checked):
+        print(f"play button clicked")
+
+    def pause_clicked(self, checked):
+        if self.currently_playing:
+            self.stop_sound(self.currently_playing)
+
+    def stop_clicked(self, checked):
+        if self.currently_playing:
+            self.stop_sound(self.currently_playing)
+
+    def tableview_get_path(self, index):
+        return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
+
     def tableview_selection_changed(self, selected, deselected):
         for r in deselected:
             for pmi in r.indexes():
-                path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
-                self.player.remove_from_play_queue(path)
-        path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
-        self.player.add_to_play_queue(path)
-        self.locationBar.setText(path)
-        sound = self.player.get(path)
-        if sound: sound.update_metadata_pane()
+                self.stop_sound(self.tableview_get_path(pmi))
+        if len(selected) == 1:
+            self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
+        else:
+            self.play.setEnabled(False)
+            self.pause.setEnabled(False)
+            self.stop.setEnabled(False)
+            if self.currently_playing:
+                self.stop_sound(self.currently_playing)
 
     def tableview_clicked(self, index):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
         if fi.isDir():
-            path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
+            path = self.tableview_get_path(index)
             self.locationBar.setText(path)
             self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
             self.treeView.setCurrentIndex(self.fs_model.index(path))
@@ -471,13 +495,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             for r in self.tableView.selectionModel().selection():
                 for pmi in r.indexes():
-                    path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(pmi))
-                    self.player.remove_from_play_queue(path)
-            path = self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
-            self.player.add_to_play_queue(path)
-            self.locationBar.setText(path)
-            sound = self.player.get(path)
-            if sound: sound.update_metadata_pane()
+                    self.stop_sound(self.tableview_get_path(pmi))
+            self.start_sound(self.tableview_get_path(index))
 
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
@@ -520,7 +539,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clipboard.setText(self.locationBar.text())
 
     def slider_value_changed(self, position):
-        sound = self.player.currently_playing()
+        sound = self.currently_playing
         if sound:
             sound.seek(position)
         else:
