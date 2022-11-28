@@ -13,6 +13,8 @@ gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst, Gtk, GLib
 
 CACHE_SIZE = 256
+SEEK_POS_UPDATER_INTERVAL_MS = 50
+SEEK_MIN_INTERVAL = 100
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 LOG = logging.getLogger()
 _handler = logging.StreamHandler(sys.stdout)
@@ -170,6 +172,8 @@ class Sound(QtCore.QObject):
         uri = pathlib.Path(path).as_uri()
         self.player.set_property('uri', uri)
         self.seek_pos_update_timer = QtCore.QTimer()
+        self.seek_min_interval_timer = None
+        self.seek_next_value = None
         self.gst_message.connect(self.receive_gst_message)
 
     def __str__(self):
@@ -229,7 +233,7 @@ class Sound(QtCore.QObject):
                 self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
                 self.player.set_state(Gst.State.PLAYING)
             else:
-                self.seek_pos_update_timer.stop()
+                self.disable_seek_pos_updates()
                 self.browser.notify_sound_stop()
         elif message.type == Gst.MessageType.TAG:
             #LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
@@ -257,30 +261,54 @@ class Sound(QtCore.QObject):
                 self.browser.seek.setValue(position * 100.0 / duration)
                 self.browser.seek.blockSignals(signals_blocked)
 
+    def enable_seek_pos_updates(self):
+        self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
+        self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
+
+    def disable_seek_pos_updates(self):
+        self.seek_pos_update_timer.stop()
+
     def play(self):
         LOG.debug(f"play {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
         self.player.set_state(Gst.State.PLAYING)
-        self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
-        self.seek_pos_update_timer.start(50)
+        self.enable_seek_pos_updates()
 
     def pause(self):
         LOG.debug(f"pause {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
-        self.seek_pos_update_timer.stop()
+        self.disable_seek_pos_updates()
         self.player.set_state(Gst.State.PAUSED)
 
     def stop(self):
         LOG.debug(f"stop {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
-        self.seek_pos_update_timer.stop()
+        self.disable_seek_pos_updates()
         self.player.set_state(Gst.State.PAUSED)
         self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
 
     def seek(self, position):
+        if self.seek_min_interval_timer != None:
+            LOG.debug(f"seek to {position} {self} delayed to limit gst seek events frequency")
+            self.seek_next_value = position
+        else:
+            self._actual_seek(position)
+            self.seek_next_value = None
+            self.seek_min_interval_timer = QtCore.QTimer()
+            self.seek_min_interval_timer.setSingleShot(True)
+            self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
+            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL)
+
+    @QtCore.Slot()
+    def seek_min_interval_timer_fired(self):
+        if self.seek_next_value:
+            self._actual_seek(self.seek_next_value)
+        self.seek_next_value = None
+        self.seek_min_interval_timer = None
+
+    def _actual_seek(self, position):
         LOG.debug(f"seek to {position} {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         if got_duration:
             seek_pos = position * duration / 100.0
             self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, seek_pos)
-            #self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.KEY_UNIT, seek_pos)
 
 class SoundManager():
 
@@ -442,6 +470,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
         self.prefsButton.clicked.connect(self.prefs_button_clicked)
         self.seek.valueChanged.connect(self.slider_value_changed)
+        self.seek.sliderPressed.connect(self.slider_pressed)
+        self.seek.sliderReleased.connect(self.slider_released)
         self.loop.setChecked(self.config['play_looped'])
         self.show_hidden_files.setChecked(self.config['show_hidden_files'])
         self.show_metadata_pane.setChecked(self.config['show_metadata_pane'])
@@ -553,13 +583,28 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clipboard.setText(self.locationBar.text())
 
     def slider_value_changed(self, position):
-        sound = self.manager.get(self.currently_playing)
-        if sound:
-            sound.seek(position)
-        else:
-            signals_blocked = self.seek.blockSignals(True)
-            self.seek.setValue(0)
-            self.seek.blockSignals(signals_blocked)
+        if self.currently_playing:
+            sound = self.manager.get(self.currently_playing)
+            if sound:
+                sound.seek(position)
+                return
+        signals_blocked = self.seek.blockSignals(True)
+        self.seek.setValue(0)
+        self.seek.blockSignals(signals_blocked)
+
+    def slider_pressed(self):
+        LOG.debug(f"slider pressed")
+        if self.currently_playing:
+            sound = self.manager.get(self.currently_playing)
+            if sound:
+                sound.disable_seek_pos_updates()
+
+    def slider_released(self):
+        LOG.debug(f"slider released")
+        if self.currently_playing:
+            sound = self.manager.get(self.currently_playing)
+            if sound:
+                sound.enable_seek_pos_updates()
 
     def notify_sound_stop(self):
         self.currently_playing = None
