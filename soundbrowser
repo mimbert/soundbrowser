@@ -475,41 +475,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setCurrentIndex(self.fs_model.index(path))
         self.treeView.expand(self.fs_model.index(path))
 
-    def notify_sound_stop(self):
-        self.play.setEnabled(True)
-        self.pause.setEnabled(False)
-        self.stop.setEnabled(False)
-
-    def stop_sound(self, path):
-        sound = self.manager.get(path)
-        if sound:
-            sound.stop()
-        if path == self.currently_playing:
-            self.currently_playing = None
-            self.notify_sound_stop()
-
-    def start_sound(self, path):
-        sound = self.manager.get(path)
-        if sound:
-            sound.play()
-            self.locationBar.setText(path)
-            sound.update_metadata_pane()
-            self.currently_playing = path
-            self.play.setEnabled(False)
-            self.pause.setEnabled(True)
-            self.stop.setEnabled(True)
-
     def play_clicked(self, checked):
-        if self.currently_playing == None:
-            self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
+        self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
 
     def pause_clicked(self, checked):
-        if self.currently_playing:
-            self.stop_sound(self.currently_playing)
+        self.pause_sound(self.currently_playing)
 
     def stop_clicked(self, checked):
-        if self.currently_playing:
-            self.stop_sound(self.currently_playing)
+        self.stop_sound(self.currently_playing)
 
     def tableview_get_path(self, index):
         return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
@@ -589,6 +562,45 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             signals_blocked = self.seek.blockSignals(True)
             self.seek.setValue(0)
             self.seek.blockSignals(signals_blocked)
+
+    def notify_sound_stop(self):
+        self.currently_playing = None
+        self.play.setEnabled(True)
+        self.pause.setEnabled(False)
+        self.stop.setEnabled(False)
+
+    def start_sound(self, path):
+        sound = self.manager.get(path)
+        if sound:
+            if self.currently_playing:
+                if self.currently_playing != path:
+                    self.stop_sound(self.currently_playing)
+            sound.play()
+            self.locationBar.setText(path)
+            sound.update_metadata_pane()
+            self.currently_playing = path
+            self.play.setEnabled(False)
+            self.pause.setEnabled(True)
+            self.stop.setEnabled(True)
+
+    def pause_sound(self, path):
+        sound = self.manager.get(path)
+        if sound:
+            sound.pause()
+        if self.currently_playing == path:
+            self.play.setEnabled(True)
+            self.pause.setEnabled(False)
+            self.stop.setEnabled(True)
+
+    def stop_sound(self, path):
+        sound = self.manager.get(path)
+        if sound:
+            sound.stop()
+        if path == self.currently_playing:
+            self.currently_playing = None
+            self.play.setEnabled(True)
+            self.pause.setEnabled(False)
+            self.stop.setEnabled(False)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sound Browser')
