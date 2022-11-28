@@ -527,7 +527,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def prefs_button_clicked(self, checked = False):
         prefs = PrefsDialog(self)
-        #prefs.show_hidden_files.setChecked(self.config['show_hidden_files'])
         prefs.specified_dir.setText(self.config['specified_dir'])
         if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
             prefs.startup_dir_mode_specified_dir.setChecked(True)
@@ -538,7 +537,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
             prefs.startup_dir_mode_home_dir.setChecked(True)
         if prefs.exec_():
-            #self.config['show_hidden_files'] = prefs.show_hidden_files.isChecked()
             if prefs.startup_dir_mode_specified_dir.isChecked():
                 self.config['startup_dir_mode'] = STARTUP_DIR_MODE_SPECIFIED_DIR
             elif prefs.startup_dir_mode_last_dir.isChecked():
