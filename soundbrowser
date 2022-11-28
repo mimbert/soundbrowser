@@ -493,7 +493,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.stop.setEnabled(True)
 
     def play_clicked(self, checked):
-        LOG.debug(f"play button clicked")
+        if self.currently_playing == None:
+            self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
 
     def pause_clicked(self, checked):
         if self.currently_playing:
