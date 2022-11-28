@@ -230,7 +230,7 @@ class Sound(QtCore.QObject):
                 self.player.set_state(Gst.State.PLAYING)
             else:
                 self.seek_pos_update_timer.stop()
-                self.browser.notify_sound_stop(self)
+                self.browser.notify_sound_stop()
         elif message.type == Gst.MessageType.TAG:
             #LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
@@ -468,7 +468,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setCurrentIndex(self.fs_model.index(path))
         self.treeView.expand(self.fs_model.index(path))
 
-    def notify_sound_stop(self, sound):
+    def notify_sound_stop(self):
         self.play.setEnabled(True)
         self.pause.setEnabled(False)
         self.stop.setEnabled(False)
@@ -477,9 +477,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         sound = self.manager.get(path)
         if sound:
             sound.stop()
-            if sound == self.currently_playing:
-                self.currently_playing = None
-                self.notify_sound_stop(sound)
+        if path == self.currently_playing:
+            self.currently_playing = None
+            self.notify_sound_stop()
 
     def start_sound(self, path):
         sound = self.manager.get(path)
@@ -487,7 +487,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             sound.play()
             self.locationBar.setText(path)
             sound.update_metadata_pane()
-            self.currently_playing = sound
+            self.currently_playing = path
             self.play.setEnabled(False)
             self.pause.setEnabled(True)
             self.stop.setEnabled(True)
@@ -574,7 +574,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clipboard.setText(self.locationBar.text())
 
     def slider_value_changed(self, position):
-        sound = self.currently_playing
+        sound = self.manager.get(self.currently_playing)
         if sound:
             sound.seek(position)
         else:
