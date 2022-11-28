@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading
+import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse
 
 from PySide2 import QtCore
 from PySide2 import QtGui
@@ -14,6 +14,10 @@ from gi.repository import GObject, Gst, Gtk, GLib
 
 CACHE_SIZE = 256
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
+LOG = logging.getLogger()
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setLevel(logging.DEBUG)
+LOG.addHandler(_handler)
 
 STARTUP_DIR_MODE_SPECIFIED_DIR = 1
 STARTUP_DIR_MODE_LAST_DIR = 2
@@ -34,20 +38,23 @@ conf_schema = schema.Schema({
 })
 
 def load_conf(path):
+    LOG.debug(f"loading conf from {path}")
     try:
         with open(path) as fh:
             conf = yaml.safe_load(fh)
     except OSError:
+        LOG.debug(f"error reading conf from {path}, using an empty conf")
         conf = {}
     return conf_schema.validate(conf)
 
 def save_conf(path, conf):
     conf = conf_schema.validate(conf)
+    LOG.debug(f"saving conf to {path}")
     try:
         with open(path, 'w') as fh:
             yaml.dump(conf, fh)
     except OSError:
-        pass
+        LOG.debug(f"unable to save conf to {path}")
 
 class LRU(collections.OrderedDict):
     'Limit size, evicting the least recently looked-up key when full'
@@ -67,6 +74,7 @@ class LRU(collections.OrderedDict):
         super().__setitem__(key, value)
         if len(self) > self.maxsize:
             oldest = next(iter(self))
+            LOG.debug(f"LRU max size, removing {oldest}")
             del self[oldest]
 
 def gst_bus_message_handler(bus, message, *user_data):
@@ -105,7 +113,6 @@ def parse_tag_list(taglist):
             img = QtGui.QImage()
             img.loadFromData(bytearr)
             img = QtGui.QPixmap(img)
-            print(f"img = {img}")
             value = (True, img)
         if value and value[0]:
             if tag == 'container-format':
@@ -116,6 +123,7 @@ def parse_tag_list(taglist):
     if len(tmp) > 0:
         containers[None] = tmp
         tmp = {}
+    #LOG.debug(f"tag_list: {containers}")
     return containers
 
 def get_milliseconds_suffix(secs):
@@ -152,6 +160,7 @@ class Sound(QtCore.QObject):
 
     def __init__(self, path = None, stat_result = None, browser = None):
         super().__init__()
+        LOG.debug(f"new sound path={path} stat={stat_result}")
         self.metadata = { None: {}, 'all': {} }
         self.path = path
         self.stat_result = stat_result
@@ -162,6 +171,9 @@ class Sound(QtCore.QObject):
         self.player.set_property('uri', uri)
         self.seek_pos_update_timer = QtCore.QTimer()
         self.gst_message.connect(self.receive_gst_message)
+
+    def __str__(self):
+        return f"Sound<path={self.path}>"
 
     def update_metadata(self, metadata):
         for k in metadata:
@@ -209,7 +221,7 @@ class Sound(QtCore.QObject):
 
     @QtCore.Slot(Gst.Message)
     def receive_gst_message(self, message):
-        #print(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
+        #LOG.debug(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
         if message.type == Gst.MessageType.STREAM_START:
             pass
         elif message.type == Gst.MessageType.EOS:
@@ -220,21 +232,22 @@ class Sound(QtCore.QObject):
                 self.seek_pos_update_timer.stop()
                 self.browser.notify_sound_stop(self)
         elif message.type == Gst.MessageType.TAG:
-            #print(f"{message.type}: {message.get_structure().to_string()}")
+            #LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
             self.update_metadata(metadata)
             self.update_metadata_pane()
         elif message.type == Gst.MessageType.WARNING:
-            print(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
+            LOG.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
         elif message.type == Gst.MessageType.ERROR:
-            print(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+            LOG.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
 
     @QtCore.Slot()
     def seek_position_updater(self):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         got_position, position = self.player.query_position(Gst.Format.TIME)
+        #LOG.debug(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}")
         if got_duration:
             if 'duration' not in self.metadata[None] or 'duration' not in self.metadata['all']:
                 self.metadata[None]['duration'] = self.metadata['all']['duration'] = duration
@@ -245,16 +258,19 @@ class Sound(QtCore.QObject):
                 self.browser.seek.blockSignals(signals_blocked)
 
     def play(self):
+        LOG.debug(f"{self} play - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
         self.player.set_state(Gst.State.PLAYING)
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(50)
 
     def stop(self):
+        LOG.debug(f"{self} stop")
         self.seek_pos_update_timer.stop()
         self.player.set_state(Gst.State.PAUSED)
         self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
 
     def seek(self, position):
+        LOG.debug(f"{self} seek to {position}")
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         if got_duration:
             seek_pos = position * duration / 100.0
@@ -268,6 +284,7 @@ class SoundManager():
         Gst.init(None)
 
     def get(self, path):
+        LOG.debug(f"sound manager get {path}")
         if path in self._cache:
             if not os.path.isfile(path):
                 del self._cache[path]
@@ -275,9 +292,12 @@ class SoundManager():
             sound = self._cache[path]
             stat_result = os.stat(path)
             if stat_result.st_mtime_ns > sound.stat_result.st_mtime_ns:
+                LOG.debug(f"{sound} in cache but changed on disk, reloading")
                 return self._load(path)
+            LOG.debug(f"{sound} in cache, using it")
             return sound
         else:
+            LOG.debug(f"{path} not in cache, load it")
             return self._load(path)
 
     def _load(self, path):
@@ -473,7 +493,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.stop.setEnabled(True)
 
     def play_clicked(self, checked):
-        print(f"play button clicked")
+        LOG.debug(f"play button clicked")
 
     def pause_clicked(self, checked):
         if self.currently_playing:
@@ -563,6 +583,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.seek.blockSignals(signals_blocked)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Sound Browser')
+    parser.add_argument('-d', '--debug', action='store_true', help='enable debug output')
+    args = parser.parse_args()
+    if args.debug:
+        LOG.setLevel(logging.DEBUG)
+    else:
+        LOG.setLevel(logging.INFO)
     app = QtWidgets.QApplication([])
     sb = SoundBrowser(app.clipboard())
     def signal_handler(sig, frame):
