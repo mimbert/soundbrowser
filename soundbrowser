@@ -263,6 +263,11 @@ class Sound(QtCore.QObject):
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(50)
 
+    def pause(self):
+        LOG.debug(f"pause {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
+        self.seek_pos_update_timer.stop()
+        self.player.set_state(Gst.State.PAUSED)
+
     def stop(self):
         LOG.debug(f"stop {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
         self.seek_pos_update_timer.stop()
