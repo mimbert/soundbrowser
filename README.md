@@ -1,16 +1,15 @@
 # Soundbrowser
 
 *Soundbrowser* is a gstreamer based sound player. It is intended to be
-a simple, fast, useful sound browser tool. Most sound player softwares
-are music players, and their user interface is designed such that
-users need to load files (into a playlist). Often they are also
+a simple, fast and useful sound browser tool. Most sound player
+softwares are music players, and their user interface is designed such
+that users need to load files (into a playlist). Often they are also
 centered around the concept of a sound library. *Soundbrowser* on the
 other hand is designed to be able to quickly browse through the
 filesystem and directly play the sounds while navigating. There is no
-concept of playlist nor sound library, it is intended to browse very
+concepts of playlist nor sound library, it is intended to browse very
 quickly through big collections of sounds or musics on the filesystem,
-listen to them, and immediately display useful metadata about these
-sounds.
+listen to them, and show useful metadata about these sounds.
 
 ## Motivations and goals
 
@@ -24,10 +23,10 @@ sounds.
 
 * display useful sound metadata, in particular BPM and Keys
 
-* listen and display to the most up to date version of files (no need
-  to explicitely reload a file if it has changed on disk)
+* listen and display the most up to date version of files (no need to
+  explicitely reload a file if it has changed on disk)
 
-* handle maximum number of sound and music fileformats
+* handle as much as possible different fileformats
 
 * fast and user-friendly user-interface
 
