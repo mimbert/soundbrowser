@@ -14,7 +14,7 @@ from gi.repository import GObject, Gst, Gtk, GLib
 
 CACHE_SIZE = 256
 SEEK_POS_UPDATER_INTERVAL_MS = 50
-SEEK_MIN_INTERVAL = 100
+SEEK_MIN_INTERVAL_MS = 100
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 LOG = logging.getLogger()
 _handler = logging.StreamHandler(sys.stdout)
@@ -262,10 +262,12 @@ class Sound(QtCore.QObject):
                 self.browser.seek.blockSignals(signals_blocked)
 
     def enable_seek_pos_updates(self):
+        LOG.debug(f"disable seek pos updates {self}")
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
 
     def disable_seek_pos_updates(self):
+        LOG.debug(f"enable seek pos updates {self}")
         self.seek_pos_update_timer.stop()
 
     def play(self):
@@ -294,7 +296,7 @@ class Sound(QtCore.QObject):
             self.seek_min_interval_timer = QtCore.QTimer()
             self.seek_min_interval_timer.setSingleShot(True)
             self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
-            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL)
+            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
 
     @QtCore.Slot()
     def seek_min_interval_timer_fired(self):
@@ -586,9 +588,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
-                sound.disable_seek_pos_updates()
                 sound.seek(position)
-                sound.enable_seek_pos_updates()
                 return
         signals_blocked = self.seek.blockSignals(True)
         self.seek.setValue(0)
