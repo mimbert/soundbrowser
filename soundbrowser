@@ -586,7 +586,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
+                sound.disable_seek_pos_updates()
                 sound.seek(position)
+                sound.enable_seek_pos_updates()
                 return
         signals_blocked = self.seek.blockSignals(True)
         self.seek.setValue(0)
