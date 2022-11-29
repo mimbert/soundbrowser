@@ -1,4 +1,4 @@
-all: ui/main_win.py ui/prefs_dial.py
+all: ui/main_win.py ui/prefs_dial.py soundbrowser_rc.py
 
 ui/%.py: ui/%.ui soundbrowser_rc.py
 	qtchooser -run-tool=uic -qt=5 $< -g python > $@
@@ -9,7 +9,7 @@ soundbrowser_rc.py: ui/soundbrowser.qrc
 clean:
 	rm -rf ui/main_win.py soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
 
-dist:
+dist: all
 	mkdir -p build/ui
 	cp *.py build/
 	mv build/soundbrowser.py build/__main__.py
