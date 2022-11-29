@@ -3,3 +3,4 @@ soundbrowser_rc.py
 ui/main_win.py
 ui/prefs_dial.py
 ui/__pycache__
+build/
