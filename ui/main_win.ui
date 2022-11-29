@@ -128,492 +128,494 @@
               </widget>
              </item>
              <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_2">
-               <property name="spacing">
-                <number>0</number>
-               </property>
-               <item>
-                <widget class="QLabel" name="image">
-                 <property name="enabled">
-                  <bool>true</bool>
-                 </property>
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QWidget" name="metadata" native="true">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <layout class="QGridLayout" name="gridLayout_5" columnstretch="0,0,0,0">
-                  <property name="leftMargin">
-                   <number>9</number>
+              <widget class="QFrame" name="bottom_pane">
+               <layout class="QHBoxLayout" name="bottom_pane_layout">
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="image">
+                  <property name="enabled">
+                   <bool>true</bool>
                   </property>
-                  <property name="horizontalSpacing">
-                   <number>6</number>
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
                   </property>
-                  <property name="verticalSpacing">
-                   <number>0</number>
+                  <property name="text">
+                   <string/>
                   </property>
-                  <item row="4" column="1">
-                   <widget class="QLabel" name="genre">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="5" column="3">
-                   <widget class="QLabel" name="key">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="7" column="0">
-                   <widget class="QLabel" name="encoder_label">
-                    <property name="text">
-                     <string>Encoder</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="7" column="1">
-                   <widget class="QLabel" name="encoder">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="3" column="1">
-                   <widget class="QLabel" name="track">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="5" column="0">
-                   <widget class="QLabel" name="bpm_label">
-                    <property name="text">
-                     <string>BPM</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="7" column="2">
-                   <widget class="QLabel" name="bitrate_label">
-                    <property name="text">
-                     <string>Bitrate</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="8" column="0">
-                   <widget class="QLabel" name="comment_label">
-                    <property name="text">
-                     <string>Comment</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="6" column="0">
-                   <widget class="QLabel" name="channel_mode_label">
-                    <property name="text">
-                     <string>Channel Mode</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="3" column="0">
-                   <widget class="QLabel" name="track_label">
-                    <property name="text">
-                     <string>Track</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="4" column="0">
-                   <widget class="QLabel" name="genre_label">
-                    <property name="text">
-                     <string>Genre</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="1">
-                   <widget class="QLabel" name="album">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="0">
-                   <widget class="QLabel" name="title_label">
-                    <property name="text">
-                     <string>Title</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="6" column="3">
-                   <widget class="QLabel" name="audio_codec">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="8" column="1" colspan="3">
-                   <widget class="QLabel" name="comment">
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="6" column="1">
-                   <widget class="QLabel" name="channel_mode">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="7" column="3">
-                   <widget class="QLabel" name="bitrate">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="0">
-                   <widget class="QLabel" name="album_label">
-                    <property name="lineWidth">
-                     <number>0</number>
-                    </property>
-                    <property name="text">
-                     <string>Album</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="2">
-                   <widget class="QLabel" name="album_artist_label">
-                    <property name="text">
-                     <string>Album Artist</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="6" column="2">
-                   <widget class="QLabel" name="audio_codec_label">
-                    <property name="text">
-                     <string>Audio Codec</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="3" column="2">
-                   <widget class="QLabel" name="duration_label">
-                    <property name="text">
-                     <string>Duration</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="5" column="1">
-                   <widget class="QLabel" name="bpm">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="3">
-                   <widget class="QLabel" name="album_artist">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="5" column="2">
-                   <widget class="QLabel" name="key_label">
-                    <property name="text">
-                     <string>Key</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="4" column="2">
-                   <widget class="QLabel" name="date_label">
-                    <property name="text">
-                     <string>Date</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="1">
-                   <widget class="QLabel" name="title">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="frameShape">
-                     <enum>QFrame::NoFrame</enum>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="2">
-                   <widget class="QLabel" name="artist_label">
-                    <property name="text">
-                     <string>Artist</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="4" column="3">
-                   <widget class="QLabel" name="date">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="3" column="3">
-                   <widget class="QLabel" name="duration">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="3">
-                   <widget class="QLabel" name="artist">
-                    <property name="autoFillBackground">
-                     <bool>false</bool>
-                    </property>
-                    <property name="text">
-                     <string/>
-                    </property>
-                    <property name="textFormat">
-                     <enum>Qt::PlainText</enum>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>false</bool>
-                    </property>
-                    <property name="textInteractionFlags">
-                     <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </widget>
-               </item>
-              </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QWidget" name="metadata" native="true">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <layout class="QGridLayout" name="gridLayout_5" columnstretch="0,0,0,0">
+                   <property name="leftMargin">
+                    <number>9</number>
+                   </property>
+                   <property name="horizontalSpacing">
+                    <number>6</number>
+                   </property>
+                   <property name="verticalSpacing">
+                    <number>0</number>
+                   </property>
+                   <item row="4" column="1">
+                    <widget class="QLabel" name="genre">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="3">
+                    <widget class="QLabel" name="key">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="0">
+                    <widget class="QLabel" name="encoder_label">
+                     <property name="text">
+                      <string>Encoder</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="1">
+                    <widget class="QLabel" name="encoder">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <widget class="QLabel" name="track">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="bpm_label">
+                     <property name="text">
+                      <string>BPM</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="2">
+                    <widget class="QLabel" name="bitrate_label">
+                     <property name="text">
+                      <string>Bitrate</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="0">
+                    <widget class="QLabel" name="comment_label">
+                     <property name="text">
+                      <string>Comment</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="0">
+                    <widget class="QLabel" name="channel_mode_label">
+                     <property name="text">
+                      <string>Channel Mode</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="track_label">
+                     <property name="text">
+                      <string>Track</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="genre_label">
+                     <property name="text">
+                      <string>Genre</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QLabel" name="album">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="title_label">
+                     <property name="text">
+                      <string>Title</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="3">
+                    <widget class="QLabel" name="audio_codec">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="8" column="1" colspan="3">
+                    <widget class="QLabel" name="comment">
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="1">
+                    <widget class="QLabel" name="channel_mode">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="3">
+                    <widget class="QLabel" name="bitrate">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="album_label">
+                     <property name="lineWidth">
+                      <number>0</number>
+                     </property>
+                     <property name="text">
+                      <string>Album</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QLabel" name="album_artist_label">
+                     <property name="text">
+                      <string>Album Artist</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="2">
+                    <widget class="QLabel" name="audio_codec_label">
+                     <property name="text">
+                      <string>Audio Codec</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="2">
+                    <widget class="QLabel" name="duration_label">
+                     <property name="text">
+                      <string>Duration</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <widget class="QLabel" name="bpm">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="3">
+                    <widget class="QLabel" name="album_artist">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="2">
+                    <widget class="QLabel" name="key_label">
+                     <property name="text">
+                      <string>Key</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="2">
+                    <widget class="QLabel" name="date_label">
+                     <property name="text">
+                      <string>Date</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QLabel" name="title">
+                     <property name="sizePolicy">
+                      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                       <horstretch>0</horstretch>
+                       <verstretch>0</verstretch>
+                      </sizepolicy>
+                     </property>
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="frameShape">
+                      <enum>QFrame::NoFrame</enum>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QLabel" name="artist_label">
+                     <property name="text">
+                      <string>Artist</string>
+                     </property>
+                     <property name="alignment">
+                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="3">
+                    <widget class="QLabel" name="date">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="3">
+                    <widget class="QLabel" name="duration">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="3">
+                    <widget class="QLabel" name="artist">
+                     <property name="autoFillBackground">
+                      <bool>false</bool>
+                     </property>
+                     <property name="text">
+                      <string/>
+                     </property>
+                     <property name="textFormat">
+                      <enum>Qt::PlainText</enum>
+                     </property>
+                     <property name="wordWrap">
+                      <bool>false</bool>
+                     </property>
+                     <property name="textInteractionFlags">
+                      <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
              </item>
             </layout>
            </item>

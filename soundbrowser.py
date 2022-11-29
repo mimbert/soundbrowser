@@ -428,9 +428,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.fs_model.setFilter(fs_model_filter)
         self.dir_model.setFilter(dir_model_filter)
         if self.config['show_metadata_pane']:
-            self.metadata.show()
+            self.bottom_pane.show()
         else:
-            self.metadata.hide()
+            self.bottom_pane.hide()
 
     def populate(self):
         self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
