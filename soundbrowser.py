@@ -262,12 +262,12 @@ class Sound(QtCore.QObject):
                 self.browser.seek.blockSignals(signals_blocked)
 
     def enable_seek_pos_updates(self):
-        LOG.debug(f"disable seek pos updates {self}")
+        LOG.debug(f"enable seek pos updates {self}")
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
 
     def disable_seek_pos_updates(self):
-        LOG.debug(f"enable seek pos updates {self}")
+        LOG.debug(f"disable seek pos updates {self}")
         self.seek_pos_update_timer.stop()
 
     def play(self):
