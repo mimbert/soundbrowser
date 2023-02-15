@@ -367,7 +367,7 @@ class SoundManager():
         Gst.init(None)
 
     def get(self, path):
-        LOG.debug(f"sound manager get {path}")
+        # LOG.debug(f"sound manager get {path}")
         if path in self._cache:
             if not os.path.isfile(path):
                 del self._cache[path]
@@ -378,7 +378,7 @@ class SoundManager():
                 LOG.debug(f"sound in cache but changed on disk, reloading (and stop it if it was playing): {sound}")
                 sound.stop()
                 return self._load(path)
-            LOG.debug(f"sound in cache, using it: {sound}")
+            # LOG.debug(f"sound in cache, using it: {sound}")
             return sound
         else:
             LOG.debug(f"sound not in cache, load it: {path}")
