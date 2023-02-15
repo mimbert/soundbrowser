@@ -271,17 +271,17 @@ class Sound(QtCore.QObject):
         self.seek_pos_update_timer.stop()
 
     def play(self):
-        LOG.debug(f"play {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
+        LOG.debug(f"play {self}")
         self.player.set_state(Gst.State.PLAYING)
         self.enable_seek_pos_updates()
 
     def pause(self):
-        LOG.debug(f"pause {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
+        LOG.debug(f"pause {self}")
         self.disable_seek_pos_updates()
         self.player.set_state(Gst.State.PAUSED)
 
     def stop(self):
-        LOG.debug(f"stop {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
+        LOG.debug(f"stop {self}")
         self.disable_seek_pos_updates()
         self.player.set_state(Gst.State.PAUSED)
         self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
@@ -306,7 +306,7 @@ class Sound(QtCore.QObject):
         self.seek_min_interval_timer = None
 
     def _actual_seek(self, position):
-        LOG.debug(f"seek to {position} {self} - current state = {Gst.Element.state_get_name(self.player.get_state(Gst.CLOCK_TIME_NONE)[1])}")
+        LOG.debug(f"seek to {position} {self}")
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         if got_duration:
             seek_pos = position * duration / 100.0
