@@ -258,10 +258,6 @@ class Sound(QtCore.QObject):
                                  Gst.SeekFlags.SEGMENT,
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
-        elif message.type == Gst.MessageType.EOS:
-            if not self.browser.config['play_looped']:
-                self.disable_seek_pos_updates()
-                self.browser.notify_sound_stop()
         elif message.type == Gst.MessageType.TAG:
             #LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
@@ -287,6 +283,10 @@ class Sound(QtCore.QObject):
                 signals_blocked = self.browser.seek.blockSignals(True)
                 self.browser.seek.setValue(position * 100.0 / duration)
                 self.browser.seek.blockSignals(signals_blocked)
+                if duration == position and not self.browser.config['play_looped']:
+                    LOG.debug(f"reached end {self}")
+                    self.disable_seek_pos_updates()
+                    self.browser.notify_sound_stop()
 
     def enable_seek_pos_updates(self):
         LOG.debug(f"enable seek pos updates {self}")
