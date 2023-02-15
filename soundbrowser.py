@@ -174,10 +174,27 @@ class Sound(QtCore.QObject):
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
         self.seek_next_value = None
+        self.gst_async_done_callbacks = []
         self.gst_message.connect(self.receive_gst_message)
+        self.paused = False
 
     def __str__(self):
         return f"Sound<path={self.path}>"
+
+    def player_set_state_with_callback(self, state, callback_tuple):
+        self.gst_async_done_callbacks.append(callback_tuple)
+        return self.player.set_state(state)
+
+    def player_set_state_blocking(self, state):
+        r = self.player.set_state(state)
+        if r == Gst.StateChangeReturn.ASYNC:
+            s, _, _ = self.player.get_state(Gst.CLOCK_TIME_NONE)
+            return s
+        return r
+
+    def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
+        self.gst_async_done_callbacks.append(callback_tuple)
+        self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
 
     def update_metadata(self, metadata):
         for k in metadata:
@@ -226,13 +243,23 @@ class Sound(QtCore.QObject):
     @QtCore.Slot(Gst.Message)
     def receive_gst_message(self, message):
         #LOG.debug(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
-        if message.type == Gst.MessageType.STREAM_START:
-            pass
-        elif message.type == Gst.MessageType.EOS:
+        if message.type == Gst.MessageType.ASYNC_DONE:
+            for callback in self.gst_async_done_callbacks:
+                func = callback[0]
+                args = callback[1]
+                kwargs = callback[2]
+                LOG.debug(f"ASYNC_DONE, calling {func.__name__} with args {args} kwargs {kwargs}")
+                func(*args, **kwargs)
+            self.gst_async_done_callbacks.clear()
+        elif message.type == Gst.MessageType.SEGMENT_DONE:
             if self.browser.config['play_looped']:
-                self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
-                self.player.set_state(Gst.State.PLAYING)
-            else:
+                self.player.seek(1.0,
+                                 Gst.Format.TIME,
+                                 Gst.SeekFlags.SEGMENT,
+                                 Gst.SeekType.SET, 0,
+                                 Gst.SeekType.NONE, 0)
+        elif message.type == Gst.MessageType.EOS:
+            if not self.browser.config['play_looped']:
                 self.disable_seek_pos_updates()
                 self.browser.notify_sound_stop()
         elif message.type == Gst.MessageType.TAG:
@@ -272,19 +299,33 @@ class Sound(QtCore.QObject):
 
     def play(self):
         LOG.debug(f"play {self}")
-        self.player.set_state(Gst.State.PLAYING)
+        if not self.paused:
+            self.player_set_state_blocking(Gst.State.PAUSED)
+            self.player.seek(1.0,
+                             Gst.Format.TIME,
+                             Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                             Gst.SeekType.SET, 0,
+                             Gst.SeekType.NONE, 0)
+        self.paused = False
         self.enable_seek_pos_updates()
+        self.player.set_state(Gst.State.PLAYING)
 
     def pause(self):
         LOG.debug(f"pause {self}")
+        self.paused = True
+        self.player_set_state_blocking(Gst.State.PAUSED)
         self.disable_seek_pos_updates()
-        self.player.set_state(Gst.State.PAUSED)
 
     def stop(self):
         LOG.debug(f"stop {self}")
-        self.disable_seek_pos_updates()
+        self.paused = False
         self.player.set_state(Gst.State.PAUSED)
-        self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, 0)
+        self.player_seek_with_callback(1.0,
+                                       Gst.Format.TIME,
+                                       Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                                       Gst.SeekType.SET, 0,
+                                       Gst.SeekType.NONE, 0,
+                                       (self.disable_seek_pos_updates,[],{}))
 
     def seek(self, position):
         if self.seek_min_interval_timer != None:
@@ -310,7 +351,13 @@ class Sound(QtCore.QObject):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         if got_duration:
             seek_pos = position * duration / 100.0
-            self.player.seek_simple(Gst.Format.TIME, Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, seek_pos)
+            self.player.seek(1.0,
+                             Gst.Format.TIME,
+                             Gst.SeekFlags.TRICKMODE,
+                             Gst.SeekType.SET, 0,
+                             Gst.SeekType.NONE, 0)
+            # Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT
+            # Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE
 
 class SoundManager():
 
