@@ -325,6 +325,15 @@ class Sound(QtCore.QObject):
                     LOG.debug(f"reached end {self}")
                     self.disable_seek_pos_updates()
                     self.browser.notify_sound_stop()
+                    # following 2 lines added because otherwise when
+                    # playing the sound again there is a timeout in
+                    # the waiting of the async state change
+                    self.player.set_state(Gst.State.PAUSED)
+                    self.player.seek(1.0,
+                                     Gst.Format.TIME,
+                                     Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                                     Gst.SeekType.SET, 0,
+                                     Gst.SeekType.NONE, 0)
 
     def enable_seek_pos_updates(self):
         LOG.debug(f"enable seek pos updates {self}")
@@ -334,6 +343,16 @@ class Sound(QtCore.QObject):
     def disable_seek_pos_updates(self):
         LOG.debug(f"disable seek pos updates {self}")
         self.seek_pos_update_timer.stop()
+        # following block added because sometimes, when the sound
+        # reaches its end, it looks like even though
+        # disable_seek_pos_updates is called before the seek to the
+        # beginning, there may still be a seek_position_updater call
+        # occuring after, which causes the slider to reset to zero
+        # anyway
+        try:
+            self.seek_pos_update_timer.timeout.disconnect(self.seek_position_updater)
+        except:
+            pass
 
     def play(self):
         LOG.debug(f"play {self}")
