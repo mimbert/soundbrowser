@@ -473,7 +473,6 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         if path:
             self.specified_dir.setText(path)
 
-
 class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def __init__(self, clipboard):
@@ -482,6 +481,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.config = load_conf(CONF_FILE)
         self.manager = SoundManager(self)
         self.currently_playing = None
+        self._ignore_click_event = False
         self.setupUi(self)
         self.populate()
 
@@ -603,9 +603,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
 
     def tableview_selection_changed(self, selected, deselected):
+        self._ignore_click_event = True
         for r in deselected:
             for pmi in r.indexes():
                 self.stop_sound(self.tableview_get_path(pmi))
+                break # only first column
         if len(selected) == 1:
             self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
         else:
@@ -616,18 +618,20 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.stop_sound(self.currently_playing)
 
     def tableview_clicked(self, index):
-        fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
-        if fi.isDir():
-            path = self.tableview_get_path(index)
-            self.locationBar.setText(path)
-            self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
-            self.treeView.setCurrentIndex(self.fs_model.index(path))
-            self.treeView.expand(self.fs_model.index(path))
-        else:
-            for r in self.tableView.selectionModel().selection():
-                for pmi in r.indexes():
-                    self.stop_sound(self.tableview_get_path(pmi))
-            self.start_sound(self.tableview_get_path(index))
+        if not self._ignore_click_event:
+            fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
+            if fi.isDir():
+                path = self.tableview_get_path(index)
+                self.locationBar.setText(path)
+                self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
+                self.treeView.setCurrentIndex(self.fs_model.index(path))
+                self.treeView.expand(self.fs_model.index(path))
+            else:
+                for r in self.tableView.selectionModel().selection():
+                    for pmi in r.indexes():
+                        self.stop_sound(self.tableview_get_path(pmi))
+                self.start_sound(self.tableview_get_path(index))
+        self._ignore_click_event = False
 
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
