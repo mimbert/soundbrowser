@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse
+import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse, traceback
 
 from PySide2 import QtCore
 from PySide2 import QtGui
@@ -16,6 +16,9 @@ CACHE_SIZE = 256
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 100
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
+
+def log_callstack():
+    LOG.debug("callstack:\n" + "".join(traceback.format_list(traceback.extract_stack())[:-1]))
 
 class CustomFormatter(logging.Formatter):
     grey = '\033[2m\033[37m'
