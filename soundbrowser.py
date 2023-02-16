@@ -14,7 +14,7 @@ from gi.repository import GObject, Gst, Gtk, GLib
 
 CACHE_SIZE = 256
 SEEK_POS_UPDATER_INTERVAL_MS = 50
-SEEK_MIN_INTERVAL_MS = 100
+SEEK_MIN_INTERVAL_MS = 200
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 def log_callstack():
@@ -593,9 +593,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
         self.prefsButton.clicked.connect(self.prefs_button_clicked)
-        self.seek.valueChanged.connect(self.slider_value_changed)
-        self.seek.sliderPressed.connect(self.slider_pressed)
-        self.seek.sliderReleased.connect(self.slider_released)
+        self.seek.mousePressEvent = self.slider_mousePressEvent
+        self.seek.mouseMoveEvent = self.slider_mouseMoveEvent
+        self.seek.mouseReleaseEvent = self.slider_mouseReleaseEvent
         self.loop.setChecked(self.config['play_looped'])
         self.show_hidden_files.setChecked(self.config['show_hidden_files'])
         self.show_metadata_pane.setChecked(self.config['show_metadata_pane'])
@@ -738,28 +738,30 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.locationBar.setSelection(0, len(self.locationBar.text()))
         self.clipboard.setText(self.locationBar.text())
 
-    def slider_value_changed(self, position):
-        if self.currently_playing:
-            sound = self.manager.get(self.currently_playing)
-            if sound:
-                sound.seek(position)
-                return
-        signals_blocked = self.seek.blockSignals(True)
-        self.seek.setValue(0)
-        self.seek.blockSignals(signals_blocked)
-
-    def slider_pressed(self):
-        LOG.debug(f"slider pressed")
+    def slider_mousePressEvent(self, mouse_event):
+        value = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
                 sound.disable_seek_pos_updates()
+                sound.seek(value)
+                self.seek.setValue(value)
 
-    def slider_released(self):
-        LOG.debug(f"slider released")
+    def slider_mouseMoveEvent(self, mouse_event):
+        value = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
+                sound.seek(value)
+                self.seek.setValue(value)
+
+    def slider_mouseReleaseEvent(self, mouse_event):
+        value = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
+        if self.currently_playing:
+            sound = self.manager.get(self.currently_playing)
+            if sound:
+                sound.seek(value)
+                self.seek.setValue(value)
                 sound.enable_seek_pos_updates()
 
     def notify_sound_stop(self):
