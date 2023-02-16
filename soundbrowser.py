@@ -428,9 +428,9 @@ class SoundManager():
         self._browser = browser
         Gst.init(None)
 
-    def get(self, path):
+    def get(self, path, force_reload=False ):
         # LOG.debug(f"sound manager get {path}")
-        if path in self._cache:
+        if path in self._cache and not force_reload:
             if not os.path.isfile(path):
                 del self._cache[path]
                 return None
@@ -443,7 +443,7 @@ class SoundManager():
             # LOG.debug(f"sound in cache, using it: {sound}")
             return sound
         else:
-            LOG.debug(f"sound not in cache, load it: {path}")
+            LOG.debug(f"sound not in cache, or reload forced, load it: {path}")
             return self._load(path)
 
     def _load(self, path):
@@ -561,6 +561,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setModel(self.fs_model)
         self.dir_proxy_model = MyQSortFilterProxyModel(self)
         self.dir_proxy_model.setSourceModel(self.dir_model)
+        self.tableView.contextMenuEvent = self.tableView_contextMenuEvent
         self.tableView.setModel(self.dir_proxy_model)
         self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
@@ -615,6 +616,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if self.config['splitter_state']:
             self.splitter.restoreState(QtCore.QByteArray(self.config['splitter_state']))
         self.image.setScaledContents(True)
+        self.tableView_contextMenu = QtWidgets.QMenu(self.tableView)
+        reload_sound_action = QtWidgets.QAction("Reload", self.tableView)
+        self.tableView_contextMenu.addAction(reload_sound_action)
+        reload_sound_action.triggered.connect(self.reload_sound)
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
@@ -673,6 +678,20 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                         break # only first column
                 self.start_sound(self.tableview_get_path(index))
         self._ignore_click_event = False
+
+    def tableView_contextMenuEvent(self, event):
+        index = self.tableView.indexAt(event.pos())
+        if index:
+            path = self.tableview_get_path(index)
+            if path:
+                self.tableView_contextMenu.path_to_reload = path
+                self.tableView_contextMenu.popup(QtGui.QCursor.pos())
+
+    def reload_sound(self):
+        path = self.tableView_contextMenu.path_to_reload
+        self.stop_sound(path)
+        sound = self.manager.get(path, force_reload=True)
+        self.start_sound(path)
 
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
