@@ -16,8 +16,27 @@ CACHE_SIZE = 256
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 100
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
+
+class CustomFormatter(logging.Formatter):
+    grey = '\033[2m\033[37m'
+    brightyellow = '\033[93m'
+    brightred = '\033[91m'
+    reversebrightboldred = '\033[7m\033[1m\033[91m'
+    reset = '\033[m'
+    format = "%(asctime)s %(levelname)s %(message)s (%(filename)s:%(funcName)s:%(lineno)d)"
+    FORMATTERS = {
+        logging.DEBUG: logging.Formatter(grey + format + reset),
+        logging.INFO: logging.Formatter(format),
+        logging.WARNING: logging.Formatter(brightyellow + format + reset),
+        logging.ERROR: logging.Formatter(brightred + format + reset),
+        logging.CRITICAL: logging.Formatter(reversebrightboldred + format + reset),
+    }
+    def format(self, record):
+        return self.FORMATTERS.get(record.levelno).format(record)
+
 LOG = logging.getLogger()
 _handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(CustomFormatter())
 _handler.setLevel(logging.DEBUG)
 LOG.addHandler(_handler)
 
@@ -125,7 +144,7 @@ def parse_tag_list(taglist):
     if len(tmp) > 0:
         containers[None] = tmp
         tmp = {}
-    #LOG.debug(f"tag_list: {containers}")
+    # LOG.debug(f"tag_list: {containers}")
     return containers
 
 def get_milliseconds_suffix(secs):
@@ -242,7 +261,7 @@ class Sound(QtCore.QObject):
 
     @QtCore.Slot(Gst.Message)
     def receive_gst_message(self, message):
-        #LOG.debug(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
+        # LOG.debug(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
         if message.type == Gst.MessageType.ASYNC_DONE:
             for callback in self.gst_async_done_callbacks:
                 func = callback[0]
@@ -259,7 +278,7 @@ class Sound(QtCore.QObject):
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
         elif message.type == Gst.MessageType.TAG:
-            #LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
+            # LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
@@ -274,7 +293,7 @@ class Sound(QtCore.QObject):
     def seek_position_updater(self):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         got_position, position = self.player.query_position(Gst.Format.TIME)
-        #LOG.debug(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}")
+        # LOG.debug(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}")
         if got_duration:
             if 'duration' not in self.metadata[None] or 'duration' not in self.metadata['all']:
                 self.metadata[None]['duration'] = self.metadata['all']['duration'] = duration
