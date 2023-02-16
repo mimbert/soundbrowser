@@ -391,11 +391,9 @@ class Sound(QtCore.QObject):
             seek_pos = position * duration / 100.0
             self.player.seek(1.0,
                              Gst.Format.TIME,
-                             Gst.SeekFlags.TRICKMODE,
-                             Gst.SeekType.SET, 0,
+                             Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, # could be Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE ?
+                             Gst.SeekType.SET, seek_pos,
                              Gst.SeekType.NONE, 0)
-            # Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT
-            # Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE
 
 class SoundManager():
 
