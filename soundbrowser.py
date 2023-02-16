@@ -358,7 +358,7 @@ class Sound(QtCore.QObject):
         except:
             pass
 
-    def play(self):
+    def play(self, start_pos=None):
         LOG.debug(f"play {self}")
         if not self.paused:
             self.player_set_state_blocking(Gst.State.PAUSED)
@@ -369,6 +369,8 @@ class Sound(QtCore.QObject):
                              Gst.SeekType.NONE, 0)
         self.paused = False
         self.enable_seek_pos_updates()
+        if start_pos != None:
+            self._actual_seek(start_pos)
         self.player.set_state(Gst.State.PLAYING)
 
     def pause(self):
@@ -739,30 +741,34 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clipboard.setText(self.locationBar.text())
 
     def slider_mousePressEvent(self, mouse_event):
-        value = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
+        position = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
-                sound.disable_seek_pos_updates()
-                sound.seek(value)
-                self.seek.setValue(value)
+                sound.seek(position)
+                self.seek.setValue(position)
+        else:
+            index = self.tableView.currentIndex()
+            if index:
+                path = self.tableview_get_path(index)
+                if path:
+                    self.start_sound(path, position)
 
     def slider_mouseMoveEvent(self, mouse_event):
-        value = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
+        position = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
-                sound.seek(value)
-                self.seek.setValue(value)
+                sound.seek(position)
+                self.seek.setValue(position)
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        value = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
+        position = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
         if self.currently_playing:
             sound = self.manager.get(self.currently_playing)
             if sound:
-                sound.seek(value)
-                self.seek.setValue(value)
-                sound.enable_seek_pos_updates()
+                sound.seek(position)
+                self.seek.setValue(position)
 
     def notify_sound_stop(self):
         self.currently_playing = None
@@ -770,13 +776,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.pause.setEnabled(False)
         self.stop.setEnabled(False)
 
-    def start_sound(self, path):
+    def start_sound(self, path, position=None):
         sound = self.manager.get(path)
         if sound:
             if self.currently_playing:
                 if self.currently_playing != path:
                     self.stop_sound(self.currently_playing)
-            sound.play()
+            sound.play(position)
             self.locationBar.setText(path)
             sound.update_metadata_pane()
             self.currently_playing = path
