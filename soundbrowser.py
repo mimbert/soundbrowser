@@ -670,6 +670,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 for r in self.tableView.selectionModel().selection():
                     for pmi in r.indexes():
                         self.stop_sound(self.tableview_get_path(pmi))
+                        break # only first column
                 self.start_sound(self.tableview_get_path(index))
         self._ignore_click_event = False
 
