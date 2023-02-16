@@ -663,21 +663,21 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.stop_sound(self.currently_playing)
 
     def tableview_clicked(self, index):
-        if not self._ignore_click_event:
-            fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
-            if fi.isDir():
-                path = self.tableview_get_path(index)
-                self.locationBar.setText(path)
-                self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
-                self.treeView.setCurrentIndex(self.fs_model.index(path))
-                self.treeView.expand(self.fs_model.index(path))
-            else:
+        fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
+        if fi.isDir():
+            path = self.tableview_get_path(index)
+            self.locationBar.setText(path)
+            self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
+            self.treeView.setCurrentIndex(self.fs_model.index(path))
+            self.treeView.expand(self.fs_model.index(path))
+        else:
+            if not self._ignore_click_event:
                 for r in self.tableView.selectionModel().selection():
                     for pmi in r.indexes():
                         self.stop_sound(self.tableview_get_path(pmi))
                         break # only first column
                 self.start_sound(self.tableview_get_path(index))
-        self._ignore_click_event = False
+            self._ignore_click_event = False
 
     def tableView_contextMenuEvent(self, event):
         index = self.tableView.indexAt(event.pos())
