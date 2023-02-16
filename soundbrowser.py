@@ -192,6 +192,8 @@ class Sound(QtCore.QObject):
         self.stat_result = stat_result
         self.browser = browser
         self.player = Gst.ElementFactory.make('playbin')
+        fakevideosink = Gst.ElementFactory.make('fakesink')
+        self.player.set_property("video-sink", fakevideosink)
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
         uri = pathlib.Path(path).as_uri()
         self.player.set_property('uri', uri)
