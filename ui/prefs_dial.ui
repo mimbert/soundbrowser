@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>516</width>
-    <height>158</height>
+    <height>185</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,8 +23,8 @@
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>10</x>
-     <y>110</y>
+     <x>0</x>
+     <y>150</y>
      <width>501</width>
      <height>27</height>
     </rect>
@@ -149,6 +149,35 @@
    </property>
    <property name="text">
     <string>Startup directory</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_2">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>110</y>
+     <width>141</width>
+     <height>19</height>
+    </rect>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="text">
+    <string>File extensions filter</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="file_extensions_filter">
+   <property name="geometry">
+    <rect>
+     <x>160</x>
+     <y>110</y>
+     <width>341</width>
+     <height>27</height>
+    </rect>
    </property>
   </widget>
  </widget>

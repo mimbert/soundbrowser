@@ -626,9 +626,6 @@
        <item row="1" column="0">
         <widget class="QFrame" name="horizontalLayoutBottom">
          <layout class="QHBoxLayout" name="horizontalLayout">
-          <property name="sizeConstraint">
-           <enum>QLayout::SetDefaultConstraint</enum>
-          </property>
           <property name="leftMargin">
            <number>0</number>
           </property>
@@ -696,6 +693,26 @@
           </item>
           <item>
            <widget class="Line" name="line_3">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="filter_files">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>Filter Files</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="line_4">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>

@@ -59,6 +59,8 @@ conf_schema = schema.Schema({
     schema.Optional('main_window_state', default=None): bytes,
     schema.Optional('splitter_state', default=None): bytes,
     schema.Optional('play_looped', default=False): bool,
+    schema.Optional('file_extensions_filter', default=['wav', 'mp3', 'aiff', 'flac', 'ogg', 'm4a', 'aac']): [str],
+    schema.Optional('filter_files', default=True): bool,
 })
 
 def load_conf(path):
@@ -480,6 +482,18 @@ class MyQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
             return False
         return super().lessThan(left, right)
 
+    def filterAcceptsRow(self, source_row, source_parent):
+        first_col_index = self.sourceModel().index(source_row, 0, source_parent);
+        file_info = self.sourceModel().fileInfo(first_col_index)
+        if file_info.isDir():
+            return super().filterAcceptsRow(source_row, source_parent)
+        filename = self.sourceModel().fileName(first_col_index)
+        remaining, sep, ext = filename.rpartition('.')
+        if not sep: return True
+        if not self.parent().config['filter_files']: return True
+        if ext in self.parent().config['file_extensions_filter']: return True
+        return False
+
 class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
     def __init__(self, *args, **kwds):
@@ -582,9 +596,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.loop.setChecked(self.config['play_looped'])
         self.show_hidden_files.setChecked(self.config['show_hidden_files'])
         self.show_metadata_pane.setChecked(self.config['show_metadata_pane'])
+        self.filter_files.setChecked(self.config['filter_files'])
         self.loop.clicked.connect(self.loop_clicked)
         self.show_hidden_files.clicked.connect(self.show_hidden_files_clicked)
         self.show_metadata_pane.clicked.connect(self.show_metadata_pane_clicked)
+        self.filter_files.clicked.connect(self.filter_files_clicked)
         self.copy_path.clicked.connect(self.copy_path_clicked)
         self.play.clicked.connect(self.play_clicked)
         self.pause.clicked.connect(self.pause_clicked)
@@ -666,8 +682,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.config['show_metadata_pane'] = checked
         self.refresh_config()
 
+    def filter_files_clicked(self, checked = False):
+        self.config['filter_files'] = checked
+        self.refresh_config()
+        self.dir_proxy_model.invalidateFilter()
+
     def prefs_button_clicked(self, checked = False):
         prefs = PrefsDialog(self)
+        prefs.file_extensions_filter.setText(' '.join(self.config['file_extensions_filter']))
         prefs.specified_dir.setText(self.config['specified_dir'])
         if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
             prefs.startup_dir_mode_specified_dir.setChecked(True)
@@ -687,6 +709,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             elif prefs.startup_dir_mode_home_dir.isChecked():
                 self.config['startup_dir_mode'] = STARTUP_DIR_MODE_HOME_DIR
             self.config['specified_dir'] = prefs.specified_dir.text()
+            self.config['file_extensions_filter'] = prefs.file_extensions_filter.text().split(' ')
             self.refresh_config()
 
     def copy_path_clicked(self, checked = False):
