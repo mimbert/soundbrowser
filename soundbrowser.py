@@ -361,6 +361,9 @@ class Sound(QtCore.QObject):
                                        Gst.SeekType.SET, 0,
                                        Gst.SeekType.NONE, 0,
                                        (self.disable_seek_pos_updates,[],{}))
+        signals_blocked = self.browser.seek.blockSignals(True)
+        self.browser.seek.setValue(0.0)
+        self.browser.seek.blockSignals(signals_blocked)
 
     def seek(self, position):
         if self.seek_min_interval_timer != None:
