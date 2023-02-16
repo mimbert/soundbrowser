@@ -207,8 +207,12 @@ class Sound(QtCore.QObject):
     def player_set_state_blocking(self, state):
         r = self.player.set_state(state)
         if r == Gst.StateChangeReturn.ASYNC:
-            s, _, _ = self.player.get_state(Gst.CLOCK_TIME_NONE)
-            return s
+            retcode, state, pending_state = self.player.get_state(10000 * Gst.MSECOND)
+            if retcode == Gst.StateChangeReturn.FAILURE:
+                LOG.warning(f"gst async state change failure after timeout. retcode: {retcode}, state: {state}, pending_state: {pending_state} ")
+            elif retcode == Gst.StateChangeReturn.ASYNC:
+                LOG.warning(f"gst async state change still async after timeout. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
+            return retcode
         return r
 
     def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
