@@ -272,11 +272,23 @@ class Sound(QtCore.QObject):
             self.gst_async_done_callbacks.clear()
         elif message.type == Gst.MessageType.SEGMENT_DONE:
             if self.browser.config['play_looped']:
+                # normal looping when no seeking has been done
                 self.player.seek(1.0,
                                  Gst.Format.TIME,
                                  Gst.SeekFlags.SEGMENT,
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
+        elif message.type == Gst.MessageType.EOS:
+            if self.browser.config['play_looped']:
+                # get this when playing looped but a seek was done while playing
+                # must then do a full restart of the stream
+                self.player_set_state_blocking(Gst.State.PAUSED)
+                self.player.seek(1.0,
+                                 Gst.Format.TIME,
+                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                                 Gst.SeekType.SET, 0,
+                                 Gst.SeekType.NONE, 0)
+                self.player.set_state(Gst.State.PLAYING)
         elif message.type == Gst.MessageType.TAG:
             # LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
