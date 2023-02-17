@@ -721,10 +721,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.default_update_play_pause_stop_buttons()
         else:
             if not self._ignore_click_event:
-                for r in self.tableView.selectionModel().selection():
-                    for pmi in r.indexes():
-                        self.stop_sound(self.tableview_get_path(pmi))
-                        break # only first column
+                # self._ignore_click_event False means that the same
+                # sound was clicked again, so no need to stop the
+                # sound, start_sound will take care of it (and
+                # stopping it twice in a short time seems to cause
+                # some issues)
                 self.start_sound(self.tableview_get_path(index))
             self._ignore_click_event = False
 
