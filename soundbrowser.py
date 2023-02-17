@@ -550,9 +550,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self._state = value
         if value == SoundState.STOPPED:
             self.currently_playing = None
-            self.play.setEnabled(True)
-            self.pause.setEnabled(False)
-            self.stop.setEnabled(False)
+            self.default_update_play_pause_stop_buttons()
         elif value == SoundState.PLAYING:
             if path:
                 self.currently_playing = path
@@ -563,6 +561,15 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.play.setEnabled(True)
             self.pause.setEnabled(True)
             self.stop.setEnabled(True)
+
+    def default_update_play_pause_stop_buttons(self):
+        if len(self.tableView.selectionModel().selectedRows()) == 1:
+            if self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex())).isFile():
+                self.play.setEnabled(True)
+            else:
+                self.play.setEnabled(False)
+        self.pause.setEnabled(False)
+        self.stop.setEnabled(False)
 
     def clean_close(self):
         self.config['main_window_geometry'] = self.saveGeometry().data()
@@ -700,9 +707,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             if self.currently_playing:
                 self.stop_sound()
-            self.play.setEnabled(False)
-            self.pause.setEnabled(False)
-            self.stop.setEnabled(False)
+            else:
+                self.default_update_play_pause_stop_buttons()
 
     def tableview_clicked(self, index):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
@@ -712,6 +718,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
             self.treeView.setCurrentIndex(self.fs_model.index(path))
             self.treeView.expand(self.fs_model.index(path))
+            self.default_update_play_pause_stop_buttons()
         else:
             if not self._ignore_click_event:
                 for r in self.tableView.selectionModel().selection():
