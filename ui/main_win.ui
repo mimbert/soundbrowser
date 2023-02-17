@@ -735,7 +735,8 @@
             </property>
             <property name="icon">
              <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/play.png</normaloff>:/icons/play.png</iconset>
+              <normaloff>:/icons/play.png</normaloff>
+              <disabledoff>:/icons/play_disabled.png</disabledoff>:/icons/play.png</iconset>
             </property>
            </widget>
           </item>
@@ -749,7 +750,8 @@
             </property>
             <property name="icon">
              <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/pause.png</normaloff>:/icons/pause.png</iconset>
+              <normaloff>:/icons/pause.png</normaloff>
+              <disabledoff>:/icons/pause_disabled.png</disabledoff>:/icons/pause.png</iconset>
             </property>
            </widget>
           </item>
@@ -763,7 +765,8 @@
             </property>
             <property name="icon">
              <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/stop.png</normaloff>:/icons/stop.png</iconset>
+              <normaloff>:/icons/stop.png</normaloff>
+              <disabledoff>:/icons/stop_disabled.png</disabledoff>:/icons/stop.png</iconset>
             </property>
            </widget>
           </item>
