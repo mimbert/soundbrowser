@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse, traceback
+import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse, traceback, enum
 
 from PySide2 import QtCore
 from PySide2 import QtGui
@@ -180,6 +180,10 @@ def format_duration(nsecs):
     formatted_duration += "%i%ss" % (s, get_milliseconds_suffix(s))
     return formatted_duration
 
+# sound states used both in Sound class, for low level state, and in SoundBrowser class, for high level state
+# not to be confused with gst state which is only PLAYING or PAUSED
+SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
+
 class Sound(QtCore.QObject):
 
     gst_message = QtCore.Signal(Gst.Message)
@@ -202,10 +206,18 @@ class Sound(QtCore.QObject):
         self.seek_next_value = None
         self.gst_async_done_callbacks = []
         self.gst_message.connect(self.receive_gst_message)
-        self.paused = False
+        self._state = SoundState.STOPPED
 
     def __str__(self):
-        return f"Sound<path={self.path}>"
+        return f"Sound<path={self.path}, state={self.state.name})>"
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        self._state = value
 
     def player_set_state_with_callback(self, state, callback_tuple):
         self.gst_async_done_callbacks.append(callback_tuple)
@@ -360,14 +372,14 @@ class Sound(QtCore.QObject):
 
     def play(self, start_pos=None):
         LOG.debug(f"play {self}")
-        if not self.paused:
+        if not self.state == SoundState.PAUSED:
             self.player_set_state_blocking(Gst.State.PAUSED)
             self.player.seek(1.0,
                              Gst.Format.TIME,
                              Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
                              Gst.SeekType.SET, 0,
                              Gst.SeekType.NONE, 0)
-        self.paused = False
+        self.state = SoundState.PLAYING
         self.enable_seek_pos_updates()
         if start_pos != None:
             self._actual_seek(start_pos)
@@ -375,13 +387,13 @@ class Sound(QtCore.QObject):
 
     def pause(self):
         LOG.debug(f"pause {self}")
-        self.paused = True
+        self.state = SoundState.PAUSED
         self.player_set_state_blocking(Gst.State.PAUSED)
         self.disable_seek_pos_updates()
 
     def stop(self):
         LOG.debug(f"stop {self}")
-        self.paused = False
+        self.state = SoundState.STOPPED
         self.player.set_state(Gst.State.PAUSED)
         self.player_seek_with_callback(1.0,
                                        Gst.Format.TIME,
