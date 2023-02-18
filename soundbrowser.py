@@ -15,7 +15,7 @@ from gi.repository import GObject, Gst, Gtk, GLib
 CACHE_SIZE = 256
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 200
-BLOCKING_GET_STATE_TIMEOUT = 10000 * Gst.MSECOND
+BLOCKING_GET_STATE_TIMEOUT = 1000 * Gst.MSECOND
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 def log_callstack():
