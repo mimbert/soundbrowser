@@ -231,8 +231,10 @@ class Sound(QtCore.QObject):
             retcode, state, pending_state = self.player.get_state(BLOCKING_GET_STATE_TIMEOUT)
             if retcode == Gst.StateChangeReturn.FAILURE:
                 LOG.warning(f"gst async state change failure after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
+                log_callstack()
             elif retcode == Gst.StateChangeReturn.ASYNC:
                 LOG.warning(f"gst async state change still async after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
+                log_callstack()
             return retcode
         return r
 
