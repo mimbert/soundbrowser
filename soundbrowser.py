@@ -309,7 +309,7 @@ class Sound(QtCore.QObject):
                 self.player_set_state_blocking(Gst.State.PAUSED)
                 self.player.seek(1.0,
                                  Gst.Format.TIME,
-                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
                 self.player.set_state(Gst.State.PLAYING)
@@ -348,7 +348,7 @@ class Sound(QtCore.QObject):
                     self.player.set_state(Gst.State.PAUSED)
                     self.player.seek(1.0,
                                      Gst.Format.TIME,
-                                     Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                                     Gst.SeekFlags.FLUSH,
                                      Gst.SeekType.SET, 0,
                                      Gst.SeekType.NONE, 0)
 
@@ -377,7 +377,7 @@ class Sound(QtCore.QObject):
             self.player_set_state_blocking(Gst.State.PAUSED)
             self.player.seek(1.0,
                              Gst.Format.TIME,
-                             Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                             Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
                              Gst.SeekType.SET, 0,
                              Gst.SeekType.NONE, 0)
         self.state = SoundState.PLAYING
@@ -398,7 +398,7 @@ class Sound(QtCore.QObject):
         self.player.set_state(Gst.State.PAUSED)
         self.player_seek_with_callback(1.0,
                                        Gst.Format.TIME,
-                                       Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
+                                       Gst.SeekFlags.FLUSH,
                                        Gst.SeekType.SET, 0,
                                        Gst.SeekType.NONE, 0,
                                        (self.disable_seek_pos_updates, [], {}))
@@ -432,7 +432,7 @@ class Sound(QtCore.QObject):
             seek_pos = position * duration / 100.0
             self.player.seek(1.0,
                              Gst.Format.TIME,
-                             Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT, # could be Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE ?
+                             Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
                              Gst.SeekType.SET, seek_pos,
                              Gst.SeekType.NONE, 0)
 
