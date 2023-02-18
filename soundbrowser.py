@@ -104,10 +104,6 @@ class LRU(collections.OrderedDict):
             LOG.debug(f"LRU max size, removing {oldest}")
             del self[oldest]
 
-def gst_bus_message_handler(bus, message, *user_data):
-    sound = user_data[0]
-    sound.gst_message.emit(message)
-    return True
 
 def parse_tag_list(taglist):
     tmp = {}
@@ -187,7 +183,7 @@ SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
 
 class Sound(QtCore.QObject):
 
-    gst_message = QtCore.Signal(Gst.Message)
+    update_metadata_message = QtCore.Signal()
 
     def __init__(self, path = None, stat_result = None, browser = None):
         super().__init__()
@@ -199,14 +195,14 @@ class Sound(QtCore.QObject):
         self.player = Gst.ElementFactory.make('playbin')
         fakevideosink = Gst.ElementFactory.make('fakesink')
         self.player.set_property("video-sink", fakevideosink)
-        self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, gst_bus_message_handler, self)
+        self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, self.gst_bus_message_handler, None)
         uri = pathlib.Path(path).as_uri()
         self.player.set_property('uri', uri)
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
         self.seek_next_value = None
         self.gst_async_done_callbacks = []
-        self.gst_message.connect(self.receive_gst_message)
+        self.update_metadata_message.connect(self.update_metadata_pane)
         self._state = SoundState.STOPPED
 
     def __str__(self):
@@ -258,6 +254,7 @@ class Sound(QtCore.QObject):
             f.setEnabled(False)
             l.setEnabled(False)
 
+    @QtCore.Slot()
     def update_metadata_pane(self):
         m = self.metadata['all']
         b = self.browser
@@ -283,8 +280,7 @@ class Sound(QtCore.QObject):
         else:
             self.browser.image.setPixmap(None)
 
-    @QtCore.Slot(Gst.Message)
-    def receive_gst_message(self, message):
+    def gst_bus_message_handler(self, bus, message, *user_data):
         # LOG.debug(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
         if message.type == Gst.MessageType.ASYNC_DONE:
             for callback in self.gst_async_done_callbacks:
@@ -319,11 +315,12 @@ class Sound(QtCore.QObject):
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
             self.update_metadata(metadata)
-            self.update_metadata_pane()
+            self.update_metadata_message.emit()
         elif message.type == Gst.MessageType.WARNING:
             LOG.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
         elif message.type == Gst.MessageType.ERROR:
             LOG.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+        return True
 
     @QtCore.Slot()
     def seek_position_updater(self):
