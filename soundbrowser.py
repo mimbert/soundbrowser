@@ -15,6 +15,7 @@ from gi.repository import GObject, Gst, Gtk, GLib
 CACHE_SIZE = 256
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 200
+BLOCKING_GET_STATE_TIMEOUT = 10000 * Gst.MSECOND
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 def log_callstack():
@@ -226,11 +227,11 @@ class Sound(QtCore.QObject):
     def player_set_state_blocking(self, state):
         r = self.player.set_state(state)
         if r == Gst.StateChangeReturn.ASYNC:
-            retcode, state, pending_state = self.player.get_state(10000 * Gst.MSECOND)
+            retcode, state, pending_state = self.player.get_state(BLOCKING_GET_STATE_TIMEOUT)
             if retcode == Gst.StateChangeReturn.FAILURE:
-                LOG.warning(f"gst async state change failure after timeout. retcode: {retcode}, state: {state}, pending_state: {pending_state} ")
+                LOG.warning(f"gst async state change failure after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
             elif retcode == Gst.StateChangeReturn.ASYNC:
-                LOG.warning(f"gst async state change still async after timeout. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
+                LOG.warning(f"gst async state change still async after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
             return retcode
         return r
 
@@ -400,7 +401,7 @@ class Sound(QtCore.QObject):
                                        Gst.SeekFlags.FLUSH | Gst.SeekFlags.ACCURATE,
                                        Gst.SeekType.SET, 0,
                                        Gst.SeekType.NONE, 0,
-                                       (self.disable_seek_pos_updates,[],{}))
+                                       (self.disable_seek_pos_updates, [], {}))
         signals_blocked = self.browser.seek.blockSignals(True)
         self.browser.seek.setValue(0.0)
         self.browser.seek.blockSignals(signals_blocked)
