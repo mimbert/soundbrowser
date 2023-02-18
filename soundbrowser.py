@@ -19,7 +19,13 @@ BLOCKING_GET_STATE_TIMEOUT = 1000 * Gst.MSECOND
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 def log_callstack():
-    LOG.debug("callstack:\n" + "".join(traceback.format_list(traceback.extract_stack())[:-1]))
+    LOG.debug(brightmagenta("callstack:\n" + "".join(traceback.format_list(traceback.extract_stack())[:-1])))
+
+def cyan(s):
+    return '\033[36m' + s + '\033[m'
+
+def brightmagenta(s):
+    return '\033[95m' + s + '\033[m'
 
 class CustomFormatter(logging.Formatter):
     grey = '\033[2m\033[37m'
@@ -27,7 +33,7 @@ class CustomFormatter(logging.Formatter):
     brightred = '\033[91m'
     reversebrightboldred = '\033[7m\033[1m\033[91m'
     reset = '\033[m'
-    format = "%(asctime)s %(levelname)s %(message)s (%(filename)s:%(funcName)s:%(lineno)d)"
+    format = "%(asctime)s %(levelname)s %(message)s" # (%(filename)s:%(funcName)s:%(lineno)d)"
     FORMATTERS = {
         logging.DEBUG: logging.Formatter(grey + format + reset),
         logging.INFO: logging.Formatter(format),
@@ -103,7 +109,6 @@ class LRU(collections.OrderedDict):
             oldest = next(iter(self))
             LOG.debug(f"LRU max size, removing {oldest}")
             del self[oldest]
-
 
 def parse_tag_list(taglist):
     tmp = {}
@@ -281,7 +286,7 @@ class Sound(QtCore.QObject):
             self.browser.image.setPixmap(None)
 
     def gst_bus_message_handler(self, bus, message, *user_data):
-        # LOG.debug(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}")
+        # LOG.debug(cyan(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
         if message.type == Gst.MessageType.ASYNC_DONE:
             for callback in self.gst_async_done_callbacks:
                 func = callback[0]
@@ -326,7 +331,7 @@ class Sound(QtCore.QObject):
     def seek_position_updater(self):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         got_position, position = self.player.query_position(Gst.Format.TIME)
-        # LOG.debug(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}")
+        # LOG.debug(cyan(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}"))
         if got_duration:
             if 'duration' not in self.metadata[None] or 'duration' not in self.metadata['all']:
                 self.metadata[None]['duration'] = self.metadata['all']['duration'] = duration
