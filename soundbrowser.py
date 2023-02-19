@@ -465,6 +465,9 @@ class SoundManager():
             LOG.debug(f"sound not in cache, or reload forced, load it: {path}")
             return self._load(path)
 
+    def is_loaded(self, path):
+        return path in self._cache
+
     def _load(self, path):
         if not os.path.isfile(path):
             return None
@@ -705,10 +708,15 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self._ignore_click_event = True
         for r in deselected:
             for pmi in r.indexes():
-                self.stop_sound(self.tableview_get_path(pmi))
+                fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(pmi))
+                path = self.tableview_get_path(pmi)
+                if fi.isFile() and self.manager.is_loaded(path):
+                    self.stop_sound(path)
                 break # only first column
         if len(selected) == 1:
-            self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
+            fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+            if fi.isFile():
+                self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
         else:
             if self.currently_playing:
                 self.stop_sound()
@@ -724,7 +732,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.treeView.setCurrentIndex(self.fs_model.index(path))
             self.treeView.expand(self.fs_model.index(path))
             self.default_update_play_pause_stop_buttons()
-        else:
+        elif fi.isFile():
             if not self._ignore_click_event:
                 # self._ignore_click_event False means that the same
                 # sound was clicked again, so no need to stop the
