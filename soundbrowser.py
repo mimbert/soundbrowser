@@ -288,7 +288,7 @@ class Sound(QtCore.QObject):
             self.browser.image.setPixmap(None)
 
     def gst_bus_message_handler(self, bus, message, *user_data):
-        # LOG.debug(cyan(f"gst_bus_message_handler message: {message.type}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
+        # LOG.debug(cyan(f"gst_bus_message_handler message: {message.type.first_value_name}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
         if message.type == Gst.MessageType.ASYNC_DONE:
             for callback in self.gst_async_done_callbacks:
                 func = callback[0]
