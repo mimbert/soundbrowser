@@ -513,9 +513,9 @@ class MyQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
             return super().filterAcceptsRow(source_row, source_parent)
         filename = self.sourceModel().fileName(first_col_index)
         remaining, sep, ext = filename.rpartition('.')
-        if not sep: return True
         if not self.parent().config['filter_files']: return True
-        if ext in self.parent().config['file_extensions_filter']: return True
+        if not sep: return False
+        if ext.lower() in [ e.lower() for e in self.parent().config['file_extensions_filter'] ]: return True
         return False
 
 class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
