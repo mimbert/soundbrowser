@@ -535,7 +535,7 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
 class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
-    def __init__(self, clipboard):
+    def __init__(self, startup_dir, clipboard):
         super().__init__()
         self._state = SoundState.STOPPED
         self.clipboard = clipboard
@@ -544,7 +544,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.currently_playing = None
         self._ignore_click_event = False
         self.setupUi(self)
-        self.populate()
+        self.populate(startup_dir)
 
     @property
     def state(self):
@@ -609,7 +609,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             self.bottom_pane.hide()
 
-    def populate(self):
+    def populate(self, startup_dir):
         self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
         self.fs_model.setRootPath((QtCore.QDir.rootPath()))
         self.dir_model = QtWidgets.QFileSystemModel(self)
@@ -634,14 +634,17 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setColumnHidden(3, True)
         self.treeView.selectionModel().selectionChanged.connect(self.treeview_selection_changed)
         self.treeView.setRootIndex(self.fs_model.index('/'))
-        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
-            startup_dir = self.config['specified_dir']
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
-            startup_dir = self.config['last_dir']
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
-            startup_dir = os.getcwd()
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
-            startup_dir = os.path.expanduser('~')
+        if startup_dir:
+            self.config['last_dir'] = startup_dir
+        else:
+            if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
+                startup_dir = self.config['specified_dir']
+            elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
+                startup_dir = self.config['last_dir']
+            elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
+                startup_dir = os.getcwd()
+            elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
+                startup_dir = os.path.expanduser('~')
         self.treeView.setCurrentIndex(self.fs_model.index(startup_dir))
         self.treeView.expand(self.fs_model.index(startup_dir))
         self.treeView.header().setSortIndicator(0,QtCore.Qt.AscendingOrder)
@@ -868,13 +871,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sound Browser')
     parser.add_argument('-d', '--debug', action='store_true', help='enable debug output')
+    parser.add_argument('startup_dir', nargs='?', help='open this directory')
     args = parser.parse_args()
     if args.debug:
         LOG.setLevel(logging.DEBUG)
     else:
         LOG.setLevel(logging.INFO)
     app = QtWidgets.QApplication([])
-    sb = SoundBrowser(app.clipboard())
+    sb = SoundBrowser(args.startup_dir, app.clipboard())
     def signal_handler(sig, frame):
         sb.clean_close()
         sys.exit(0)
