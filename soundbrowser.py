@@ -687,6 +687,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView_contextMenu.addAction(reload_sound_action)
         reload_sound_action.triggered.connect(self.reload_sound)
         self.state = SoundState.STOPPED
+        # keyboard shortcuts
+        self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
+        self.paste_shortcut.activated.connect(self.mainwin_paste)
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
@@ -733,6 +736,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             if path:
                 self.tableView_contextMenu.path_to_reload = path
                 self.tableView_contextMenu.popup(QtGui.QCursor.pos())
+
+    def mainwin_paste(self):
+        pasted = self.clipboard.text()
+        path, filename = split_path_filename(pasted)
+        if path:
+            self.treeView.setCurrentIndex(self.fs_model.index(path))
+            self.treeView.expand(self.fs_model.index(path))
 
     def reload_sound(self):
         path = self.tableView_contextMenu.path_to_reload
