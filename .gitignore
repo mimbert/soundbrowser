@@ -6,3 +6,4 @@ ui/__pycache__
 build/
 soundbrowser
 .vagrant
+*.wav
