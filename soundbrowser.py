@@ -181,6 +181,14 @@ def format_duration(nsecs):
     formatted_duration += "%i%ss" % (s, get_milliseconds_suffix(s))
     return formatted_duration
 
+def split_path_filename(s):
+    if os.path.isdir(s):
+        return s, None
+    elif os.path.isfile(s):
+        return os.path.dirname(s), os.path.basename(s)
+    else:
+        return None, None
+
 # sound states used both in Sound class, for low level state, and in SoundBrowser class, for high level state
 # not to be confused with gst state which is only PLAYING or PAUSED
 SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
@@ -534,7 +542,7 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
 class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
-    def __init__(self, startup_dir, clipboard):
+    def __init__(self, startup_path, clipboard):
         super().__init__()
         self._state = SoundState.STOPPED
         self.clipboard = clipboard
@@ -542,7 +550,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.manager = SoundManager(self)
         self.currently_playing = None
         self.setupUi(self)
-        self.populate(startup_dir)
+        self.populate(startup_path)
 
     @property
     def state(self):
@@ -604,7 +612,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             self.bottom_pane.hide()
 
-    def populate(self, startup_dir):
+    def populate(self, startup_path):
         self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
         self.fs_model.setRootPath((QtCore.QDir.rootPath()))
         self.dir_model = QtWidgets.QFileSystemModel(self)
@@ -628,11 +636,16 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setColumnHidden(3, True)
         self.treeView.selectionModel().selectionChanged.connect(self.treeview_selection_changed)
         self.treeView.setRootIndex(self.fs_model.index('/'))
+        startup_dir, startup_filename = None, None
+        if startup_path:
+            startup_dir, startup_filename = split_path_filename(startup_path)
         if startup_dir:
             self.config['last_dir'] = startup_dir
         else:
             if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
-                startup_dir = self.config['specified_dir']
+                startup_dir, startup_filename = split_path_filename(self.config['specified_dir'])
+                if not startup_dir:
+                    startup_dir = os.getcwd()
             elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
                 startup_dir = self.config['last_dir']
             elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
@@ -839,14 +852,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sound Browser')
     parser.add_argument('-d', '--debug', action='store_true', help='enable debug output')
-    parser.add_argument('startup_dir', nargs='?', help='open this directory')
+    parser.add_argument('startup_path', nargs='?', help='open this path')
     args = parser.parse_args()
     if args.debug:
         LOG.setLevel(logging.DEBUG)
     else:
         LOG.setLevel(logging.INFO)
     app = QtWidgets.QApplication([])
-    sb = SoundBrowser(args.startup_dir, app.clipboard())
+    sb = SoundBrowser(args.startup_path, app.clipboard())
     def signal_handler(sig, frame):
         sb.clean_close()
         sys.exit(0)
