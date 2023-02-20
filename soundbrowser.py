@@ -61,7 +61,6 @@ conf_schema = schema.Schema({
     schema.Optional('last_dir', default=os.path.expanduser('~')): str,
     schema.Optional('show_hidden_files', default=False): bool,
     schema.Optional('show_metadata_pane', default=True): bool,
-    schema.Optional('show_parent_folder_in_file_pane', default=True): bool,
     schema.Optional('main_window_geometry', default=None): bytes,
     schema.Optional('main_window_state', default=None): bytes,
     schema.Optional('splitter_state', default=None): bytes,
@@ -597,10 +596,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if self.config['show_hidden_files']:
             fs_model_filter |= QtCore.QDir.Hidden
             dir_model_filter |= QtCore.QDir.Hidden
-        if self.config['show_parent_folder_in_file_pane']:
-            dir_model_filter |= QtCore.QDir.NoDot
-        else:
-            dir_model_filter |= QtCore.QDir.NoDotAndDotDot
+        dir_model_filter |= QtCore.QDir.NoDot
         self.fs_model.setFilter(fs_model_filter)
         self.dir_model.setFilter(dir_model_filter)
         if self.config['show_metadata_pane']:
