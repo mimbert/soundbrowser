@@ -542,7 +542,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.config = load_conf(CONF_FILE)
         self.manager = SoundManager(self)
         self.currently_playing = None
-        self._ignore_click_event = False
         self.setupUi(self)
         self.populate(startup_dir)
 
@@ -621,7 +620,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView.setModel(self.dir_proxy_model)
         self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
         self.tableView.clicked.connect(self.tableview_clicked)
         self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
         self.tableView.verticalHeader().hide()
@@ -707,25 +705,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def tableview_get_path(self, index):
         return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
 
-    def tableview_selection_changed(self, selected, deselected):
-        self._ignore_click_event = True
-        for r in deselected:
-            for pmi in r.indexes():
-                fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(pmi))
-                path = self.tableview_get_path(pmi)
-                if fi.isFile() and self.manager.is_loaded(path):
-                    self.stop_sound(path)
-                break # only first column
-        if len(selected) == 1:
-            fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
-            if fi.isFile():
-                self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
-        else:
-            if self.currently_playing:
-                self.stop_sound()
-            else:
-                self.default_update_play_pause_stop_buttons()
-
     def tableview_clicked(self, index):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
         if fi.isDir():
@@ -736,14 +715,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.treeView.expand(self.fs_model.index(path))
             self.default_update_play_pause_stop_buttons()
         elif fi.isFile():
-            if not self._ignore_click_event:
-                # self._ignore_click_event False means that the same
-                # sound was clicked again, so no need to stop the
-                # sound, start_sound will take care of it (and
-                # stopping it twice in a short time seems to cause
-                # some issues)
-                self.start_sound(self.tableview_get_path(index))
-            self._ignore_click_event = False
+            self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
 
     def tableView_contextMenuEvent(self, event):
         index = self.tableView.indexAt(event.pos())
