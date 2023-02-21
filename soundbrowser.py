@@ -688,6 +688,12 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         reload_sound_action.triggered.connect(self.reload_sound)
         self.state = SoundState.STOPPED
         # keyboard shortcuts
+        tableView_return_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Return), self.tableView)
+        tableView_enter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Enter), self.tableView)
+        tableView_return_shortcut.setContext(QtCore.Qt.WidgetShortcut)
+        tableView_enter_shortcut.setContext(QtCore.Qt.WidgetShortcut)
+        tableView_return_shortcut.activated.connect(self.tableView_return_pressed)
+        tableView_enter_shortcut.activated.connect(self.tableView_return_pressed)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
         self.tableView.setFocus()
@@ -718,10 +724,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def tableview_get_path(self, index):
         return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
 
-    def tableview_clicked(self, index):
-        fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(index))
+    def tableView_return_pressed(self):
+        fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
         if fi.isDir():
-            path = self.tableview_get_path(index)
+            path = self.tableview_get_path(self.tableView.currentIndex())
             self.locationBar.setText(path)
             self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
             self.treeView.setCurrentIndex(self.fs_model.index(path))
@@ -730,6 +736,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         elif fi.isFile():
             self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
 
+    def tableview_clicked(self, index):
+        self.tableView_return_pressed()
     def tableView_contextMenuEvent(self, event):
         index = self.tableView.indexAt(event.pos())
         if index:
