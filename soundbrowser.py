@@ -624,6 +624,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView.setModel(self.dir_proxy_model)
         self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
         self.tableView.clicked.connect(self.tableview_clicked)
         self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
         self.tableView.verticalHeader().hide()
@@ -750,6 +751,15 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def filter_shortcut_activated(self):
         self.filter_files.click()
+
+    def tableview_selection_changed(self, selected, deselected):
+        if len(selected) != 1:
+           if self.currently_playing:
+                self.stop_sound()
+        else:
+            if self.currently_playing != self.tableview_get_path(self.tableView.currentIndex()):
+                self.stop_sound()
+        self.default_update_play_pause_stop_buttons()
 
     def tableView_return_pressed(self):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
