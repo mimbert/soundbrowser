@@ -695,6 +695,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         tableView_enter_shortcut.setContext(QtCore.Qt.WidgetShortcut)
         tableView_return_shortcut.activated.connect(self.tableView_return_pressed)
         tableView_enter_shortcut.activated.connect(self.tableView_return_pressed)
+        loop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_L), self)
+        metadata_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_M), self)
+        hidden_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_H), self)
+        filter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F), self)
+        loop_shortcut.activated.connect(self.loop_shortcut_activated)
+        metadata_shortcut.activated.connect(self.metadata_shortcut_activated)
+        hidden_shortcut.activated.connect(self.hidden_shortcut_activated)
+        filter_shortcut.activated.connect(self.filter_shortcut_activated)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
         self.tableView.setFocus()
@@ -730,6 +738,18 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if directory:
             self.treeView.setCurrentIndex(self.fs_model.index(directory))
             self.treeView.expand(self.fs_model.index(directory))
+
+    def loop_shortcut_activated(self):
+        self.loop.click()
+
+    def metadata_shortcut_activated(self):
+        self.show_metadata_pane.click()
+
+    def hidden_shortcut_activated(self):
+        self.show_hidden_files.click()
+
+    def filter_shortcut_activated(self):
+        self.filter_files.click()
 
     def tableView_return_pressed(self):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
