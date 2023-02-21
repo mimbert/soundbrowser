@@ -690,6 +690,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         # keyboard shortcuts
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
+        self.tableView.setFocus()
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
