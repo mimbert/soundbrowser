@@ -712,7 +712,31 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         stop_shortcut.activated.connect(self.stop_shortcut_activated)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
+        self.clear_metadata_pane()
         self.tableView.setFocus()
+
+    def clear_metadata_pane(self):
+        for field, default_val in [
+                ('title', ''),
+                ('artist', ''),
+                ('album', ''),
+                ('album_artist', ''),
+                ('track', '?/?'),
+                ('duration', ''),
+                ('genre', ''),
+                ('date', ''),
+                ('bpm', ''),
+                ('key', ''),
+                ('channel_mode', ''),
+                ('audio_codec', ''),
+                ('encoder', ''),
+                ('bitrate', '? (min=?/max=?)'),
+                ('comment', ''),
+                ]:
+            getattr(self, field).setText(default_val)
+            getattr(self, field).setEnabled(False)
+            getattr(self, field + '_label').setEnabled(False)
+        self.image.setPixmap(None)
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
@@ -771,6 +795,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             if self.currently_playing != self.tableview_get_path(self.tableView.currentIndex()):
                 self.stop_sound()
+            sound = self.manager.get(self.tableview_get_path(self.tableView.currentIndex()))
+            if sound:
+                sound.update_metadata_pane()
+            else:
+                sound.clear_metadata_pane()
         self.default_update_play_pause_stop_buttons()
 
     def tableView_return_pressed(self):
