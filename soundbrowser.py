@@ -564,16 +564,17 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self._state = value
         if value == SoundState.STOPPED:
             self.currently_playing = None
+            self.play.setIcon(self.play_icon)
             self.default_update_play_pause_stop_buttons()
         elif value == SoundState.PLAYING:
             if path:
                 self.currently_playing = path
-            self.play.setEnabled(False)
-            self.pause.setEnabled(True)
+            self.play.setIcon(self.pause_icon)
+            self.play.setEnabled(True)
             self.stop.setEnabled(True)
         elif value == SoundState.PAUSED:
+            self.play.setIcon(self.play_icon)
             self.play.setEnabled(True)
-            self.pause.setEnabled(True)
             self.stop.setEnabled(True)
 
     def default_update_play_pause_stop_buttons(self):
@@ -582,7 +583,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.play.setEnabled(True)
             else:
                 self.play.setEnabled(False)
-        self.pause.setEnabled(False)
         self.stop.setEnabled(False)
 
     def clean_close(self):
@@ -674,8 +674,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.filter_files.clicked.connect(self.filter_files_clicked)
         self.copy_path.clicked.connect(self.copy_path_clicked)
         self.play.clicked.connect(self.play_clicked)
-        self.pause.clicked.connect(self.pause_clicked)
         self.stop.clicked.connect(self.stop_clicked)
+        self.pause_icon = QtGui.QIcon(":/icons/pause.png")
+        self.play_icon = QtGui.QIcon(":/icons/play.png")
+        self.play_icon.addFile(":/icons/play_disabled.png", mode=QtGui.QIcon.Disabled)
         self.refresh_config()
         if self.config['main_window_geometry']:
             self.restoreGeometry(QtCore.QByteArray(self.config['main_window_geometry']))
@@ -700,10 +702,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         metadata_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_M), self)
         hidden_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_H), self)
         filter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F), self)
+        play_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space), self)
+        stop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
         loop_shortcut.activated.connect(self.loop_shortcut_activated)
         metadata_shortcut.activated.connect(self.metadata_shortcut_activated)
         hidden_shortcut.activated.connect(self.hidden_shortcut_activated)
         filter_shortcut.activated.connect(self.filter_shortcut_activated)
+        play_shortcut.activated.connect(self.play_shortcut_activated)
+        stop_shortcut.activated.connect(self.stop_shortcut_activated)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
         self.tableView.setFocus()
@@ -723,10 +729,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.expand(self.fs_model.index(path))
 
     def play_clicked(self, checked):
-        self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
-
-    def pause_clicked(self, checked):
-        self.pause_sound()
+        if self.state == SoundState.STOPPED:
+            self.start_sound(self.tableview_get_path(self.tableView.currentIndex()))
+        else:
+            self.pause_sound()
 
     def stop_clicked(self, checked):
         self.stop_sound()
@@ -751,6 +757,12 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def filter_shortcut_activated(self):
         self.filter_files.click()
+
+    def play_shortcut_activated(self):
+        self.play.click()
+
+    def stop_shortcut_activated(self):
+        self.stop.click()
 
     def tableview_selection_changed(self, selected, deselected):
         if len(selected) != 1:

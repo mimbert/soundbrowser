@@ -741,21 +741,6 @@
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="pause">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>...</string>
-            </property>
-            <property name="icon">
-             <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/pause.png</normaloff>
-              <disabledoff>:/icons/pause_disabled.png</disabledoff>:/icons/pause.png</iconset>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QToolButton" name="stop">
             <property name="enabled">
              <bool>false</bool>
