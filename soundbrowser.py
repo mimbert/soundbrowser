@@ -739,11 +739,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.tableView_contextMenu.popup(QtGui.QCursor.pos())
 
     def mainwin_paste(self):
-        pasted = self.clipboard.text()
-        path, filename = split_path_filename(pasted)
-        if path:
-            self.treeView.setCurrentIndex(self.fs_model.index(path))
-            self.treeView.expand(self.fs_model.index(path))
+        directory, filename = split_path_filename(self.clipboard.text())
+        if directory:
+            self.treeView.setCurrentIndex(self.fs_model.index(directory))
+            self.treeView.expand(self.fs_model.index(directory))
 
     def reload_sound(self):
         path = self.tableView_contextMenu.path_to_reload
