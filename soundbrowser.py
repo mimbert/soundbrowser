@@ -658,6 +658,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setSortingEnabled(True)
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
+        self.locationBar.returnPressed.connect(self.locationBar_return_pressed)
         self.prefsButton.clicked.connect(self.prefs_button_clicked)
         self.seek.mousePressEvent = self.slider_mousePressEvent
         self.seek.mouseMoveEvent = self.slider_mouseMoveEvent
@@ -724,6 +725,12 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def tableview_get_path(self, index):
         return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
 
+    def locationBar_return_pressed(self):
+        directory, filename = split_path_filename(self.locationBar.text())
+        if directory:
+            self.treeView.setCurrentIndex(self.fs_model.index(directory))
+            self.treeView.expand(self.fs_model.index(directory))
+
     def tableView_return_pressed(self):
         fi = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
         if fi.isDir():
@@ -738,6 +745,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def tableview_clicked(self, index):
         self.tableView_return_pressed()
+
     def tableView_contextMenuEvent(self, event):
         index = self.tableView.indexAt(event.pos())
         if index:
