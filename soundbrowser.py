@@ -189,6 +189,12 @@ def split_path_filename(s):
     else:
         return None, None
 
+def set_pixmap(qlabel, qpixmap):
+    w = qlabel.width()
+    h = qlabel.height()
+    qlabel.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
+    qlabel.setPixmap(qpixmap.scaled(w, h, QtCore.Qt.KeepAspectRatio))
+
 # sound states used both in Sound class, for low level state, and in SoundBrowser class, for high level state
 # not to be confused with gst state which is only PLAYING or PAUSED
 SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
@@ -290,7 +296,7 @@ class Sound(QtCore.QObject):
                                    True if 'bitrate' in m else False)
         self.update_metadata_field('comment', m.get('comment', ''))
         if m.get('image'):
-            self.browser.image.setPixmap(m.get('image'))
+            set_pixmap(self.browser.image, m.get('image'))
         else:
             self.browser.image.setPixmap(None)
 
@@ -685,7 +691,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.restoreState(QtCore.QByteArray(self.config['main_window_state']))
         if self.config['splitter_state']:
             self.splitter.restoreState(QtCore.QByteArray(self.config['splitter_state']))
-        self.image.setScaledContents(True)
         self.tableView_contextMenu = QtWidgets.QMenu(self.tableView)
         reload_sound_action = QtWidgets.QAction("Reload", self.tableView)
         self.tableView_contextMenu.addAction(reload_sound_action)
