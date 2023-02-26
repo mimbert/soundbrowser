@@ -67,6 +67,8 @@ conf_schema = schema.Schema({
     schema.Optional('play_looped', default=False): bool,
     schema.Optional('file_extensions_filter', default=['wav', 'mp3', 'aiff', 'flac', 'ogg', 'm4a', 'aac']): [str],
     schema.Optional('filter_files', default=True): bool,
+    schema.Optional('gst_audio_sink', default=''): str,
+    schema.Optional('gst_audio_sink_properties', default={}): {schema.Optional(str): str},
 })
 
 def load_conf(path):
@@ -212,6 +214,11 @@ class Sound(QtCore.QObject):
         self.browser = browser
         self.player = Gst.ElementFactory.make('playbin')
         self.player.set_property('flags', self.player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)) # disable video, subtitles, visualisation
+        if self.browser.config['gst_audio_sink']:
+            audiosink = Gst.ElementFactory.make(self.browser.config['gst_audio_sink'])
+            for k, v in self.browser.config['gst_audio_sink_properties'].items():
+                audiosink.set_property(k, v)
+            self.player.set_property("audio-sink", audiosink)
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, self.gst_bus_message_handler, None)
         uri = pathlib.Path(path).as_uri()
         self.player.set_property('uri', uri)
