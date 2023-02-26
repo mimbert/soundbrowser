@@ -324,10 +324,15 @@ class Sound(QtCore.QObject):
                                  Gst.SeekFlags.SEGMENT,
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
+            else:
+                self.state = SoundState.STOPPED
+                self.disable_seek_pos_updates()
+                self.browser.notify_sound_stop()
+                LOG.debug(f"reached end {self}")
         elif message.type == Gst.MessageType.EOS:
             if self.browser.config['play_looped']:
-                # get this when playing looped but a seek was done while playing
-                # must then do a full restart of the stream
+                # playing looped but a seek was done while playing
+                # so must do a full restart of the stream
                 self.player_set_state_blocking(Gst.State.PAUSED)
                 self.player.seek(1.0,
                                  Gst.Format.TIME,
@@ -335,6 +340,11 @@ class Sound(QtCore.QObject):
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
                 self.player.set_state(Gst.State.PLAYING)
+            else:
+                self.state = SoundState.STOPPED
+                self.disable_seek_pos_updates()
+                self.browser.notify_sound_stop()
+                LOG.debug(f"reached end {self}")
         elif message.type == Gst.MessageType.TAG:
             # LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
@@ -361,19 +371,11 @@ class Sound(QtCore.QObject):
                 signals_blocked = self.browser.seek.blockSignals(True)
                 self.browser.seek.setValue(position * 100.0 / duration)
                 self.browser.seek.blockSignals(signals_blocked)
-                if duration == position and not self.browser.config['play_looped']:
-                    LOG.debug(f"reached end {self}")
+                if position >= duration and not self.browser.config['play_looped']:
+                    self.state = SoundState.STOPPED
                     self.disable_seek_pos_updates()
                     self.browser.notify_sound_stop()
-                    # following 2 lines added because otherwise when
-                    # playing the sound again there is a timeout in
-                    # the waiting of the async state change
-                    self.player.set_state(Gst.State.PAUSED)
-                    self.player.seek(1.0,
-                                     Gst.Format.TIME,
-                                     Gst.SeekFlags.FLUSH,
-                                     Gst.SeekType.SET, 0,
-                                     Gst.SeekType.NONE, 0)
+                    LOG.debug(f"reached end {self}")
 
     def enable_seek_pos_updates(self):
         LOG.debug(f"enable seek pos updates {self}")
@@ -398,11 +400,19 @@ class Sound(QtCore.QObject):
         LOG.debug(f"play {self}")
         if not self.state == SoundState.PAUSED:
             self.player_set_state_blocking(Gst.State.PAUSED)
-            self.player.seek(1.0,
-                             Gst.Format.TIME,
-                             Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                             Gst.SeekType.SET, 0,
-                             Gst.SeekType.NONE, 0)
+            LOG.debug(f"rewind {self}")
+            if self.browser.config['play_looped']:
+                self.player.seek(1.0,
+                                 Gst.Format.TIME,
+                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+                                 Gst.SeekType.SET, 0,
+                                 Gst.SeekType.NONE, 0)
+            else:
+                self.player.seek(1.0,
+                                 Gst.Format.TIME,
+                                 Gst.SeekFlags.FLUSH,
+                                 Gst.SeekType.SET, 0,
+                                 Gst.SeekType.NONE, 0)
         self.state = SoundState.PLAYING
         self.enable_seek_pos_updates()
         if start_pos != None:
