@@ -366,7 +366,7 @@ class Sound(QtCore.QObject):
             if self.browser.config['play_looped']:
                 # playing looped but a seek was done while playing
                 # so must do a full restart of the stream
-                self.player_set_state_blocking(Gst.State.PAUSED)
+                self.player.set_state(Gst.State.PAUSED)
                 self.player.seek(1.0,
                                  Gst.Format.TIME,
                                  Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
@@ -431,8 +431,8 @@ class Sound(QtCore.QObject):
     def play(self, start_pos=None):
         LOG.debug(f"play {self}")
         if not self.state == SoundState.PAUSED:
-            self.player_set_state_blocking(Gst.State.PAUSED)
             LOG.debug(f"rewind {self}")
+            self.player.set_state(Gst.State.PAUSED)
             if self.browser.config['play_looped']:
                 self.player.seek(1.0,
                                  Gst.Format.TIME,
@@ -454,7 +454,7 @@ class Sound(QtCore.QObject):
     def pause(self):
         LOG.debug(f"pause {self}")
         self.state = SoundState.PAUSED
-        self.player_set_state_blocking(Gst.State.PAUSED)
+        self.player.set_state(Gst.State.PAUSED)
         self.disable_seek_pos_updates()
 
     def stop(self):
