@@ -197,6 +197,9 @@ def set_pixmap(qlabel, qpixmap):
     qlabel.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
     qlabel.setPixmap(qpixmap.scaled(w, h, QtCore.Qt.KeepAspectRatio))
 
+def log_gst_message(message):
+    LOG.debug(cyan(f"gst message: {message.type.first_value_name}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
+
 # sound states used both in Sound class, for low level state, and in SoundBrowser class, for high level state
 # not to be confused with gst state which is only PLAYING or PAUSED
 SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
@@ -307,7 +310,6 @@ class Sound(QtCore.QObject):
             self.browser.image.setPixmap(None)
 
     def gst_bus_message_handler(self, bus, message, *user_data):
-        # LOG.debug(cyan(f"gst_bus_message_handler message: {message.type.first_value_name}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
         if message.type == Gst.MessageType.ASYNC_DONE:
             for callback in self.gst_async_done_callbacks:
                 func = callback[0]
@@ -317,6 +319,7 @@ class Sound(QtCore.QObject):
                 func(*args, **kwargs)
             self.gst_async_done_callbacks.clear()
         elif message.type == Gst.MessageType.SEGMENT_DONE:
+            log_gst_message(message)
             if self.browser.config['play_looped']:
                 # normal looping when no seeking has been done
                 self.player.seek(1.0,
@@ -330,6 +333,7 @@ class Sound(QtCore.QObject):
                 self.browser.notify_sound_stop()
                 LOG.debug(f"reached end {self}")
         elif message.type == Gst.MessageType.EOS:
+            log_gst_message(message)
             if self.browser.config['play_looped']:
                 # playing looped but a seek was done while playing
                 # so must do a full restart of the stream
@@ -346,7 +350,6 @@ class Sound(QtCore.QObject):
                 self.browser.notify_sound_stop()
                 LOG.debug(f"reached end {self}")
         elif message.type == Gst.MessageType.TAG:
-            # LOG.debug(f"{message.type}: {message.get_structure().to_string()}")
             message_struct = message.get_structure()
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
