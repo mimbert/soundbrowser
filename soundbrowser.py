@@ -260,9 +260,38 @@ class Sound(QtCore.QObject):
             return retcode
         return r
 
+    def wait_state_stable(self):
+        while True:
+            LOG.debug(f"wait state of {self} stable")
+            retcode, state, pending_state = self.player.get_state(Gst.CLOCK_TIME_NONE)
+            print(f"retcode = {retcode}, state = {state}, pending_state = {pending_state}")
+            if retcode == Gst.StateChangeReturn.SUCCESS:
+                print(f"ok no more pending state changes")
+                return retcode, state, pending_state
+
+    def safe_seek(self, rate, format, flags, start_type, start, stop_type, stop):
+        while True:
+            retcode, state, pending_state = wait_state_stable(self.player)
+            if (state == Gst.State.PAUSED
+                or (state == Gst.State.PLAYING
+                    and flags & Gst.SeekFlags.FLUSH)):
+                break
+        return self.player.seek(rate, format, flags, start_type, start, stop_type, stop)
+
     def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
         self.gst_async_done_callbacks.append(callback_tuple)
         self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
+
+    def player_seek_blocking(self, rate, formt, flags, start_type, start, stop_type, stop):
+        finished = threading.Event()
+        self.player_seek_with_callback(rate, formt, flags, start_type, start, stop_type, stop,
+                                       (lambda: finished.set(), [], {}))
+        timeout = BLOCKING_GET_STATE_TIMEOUT / (Gst.MSECOND * 1000.0)
+        if not finished.wait(timeout):
+            LOG.warning(f"wait for seek completion failure after timeout of {timeout}s.")
+            log_callstack()
+            return False
+        return True
 
     def update_metadata(self, metadata):
         for k in metadata:
