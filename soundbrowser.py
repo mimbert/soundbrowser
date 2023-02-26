@@ -554,11 +554,12 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
 class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
-    def __init__(self, startup_path, clipboard):
+    def __init__(self, startup_path, clipboard, conf_file):
         super().__init__()
         self._state = SoundState.STOPPED
         self.clipboard = clipboard
-        self.config = load_conf(CONF_FILE)
+        self.conf_file = conf_file
+        self.config = load_conf(self.conf_file)
         self.manager = SoundManager(self)
         self.currently_playing = None
         self.setupUi(self)
@@ -603,7 +604,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.config['splitter_state'] = self.splitter.saveState().data()
         if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
             self.config['last_dir'] = self.fs_model.filePath(self.treeView.currentIndex())
-        save_conf(CONF_FILE, self.config)
+        save_conf(self.conf_file, self.config)
 
     def closeEvent(self, event):
         self.clean_close()
@@ -960,6 +961,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sound Browser')
     parser.add_argument('-d', '--debug', action='store_true', help='enable debug output')
+    parser.add_argument('-c', '--conf_file', type=str, default=CONF_FILE, help=f'use alternate conf file (default={CONF_FILE})')
     parser.add_argument('startup_path', nargs='?', help='open this path')
     args = parser.parse_args()
     if args.debug:
@@ -967,7 +969,7 @@ if __name__ == '__main__':
     else:
         LOG.setLevel(logging.INFO)
     app = QtWidgets.QApplication([])
-    sb = SoundBrowser(args.startup_path, app.clipboard())
+    sb = SoundBrowser(args.startup_path, app.clipboard(), args.conf_file)
     def signal_handler(sig, frame):
         sb.clean_close()
         sys.exit(0)
