@@ -211,8 +211,7 @@ class Sound(QtCore.QObject):
         self.stat_result = stat_result
         self.browser = browser
         self.player = Gst.ElementFactory.make('playbin')
-        fakevideosink = Gst.ElementFactory.make('fakesink')
-        self.player.set_property("video-sink", fakevideosink)
+        self.player.set_property('flags', self.player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)) # disable video, subtitles, visualisation
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, self.gst_bus_message_handler, None)
         uri = pathlib.Path(path).as_uri()
         self.player.set_property('uri', uri)
