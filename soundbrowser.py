@@ -33,7 +33,7 @@ class CustomFormatter(logging.Formatter):
     brightred = '\033[91m'
     reversebrightboldred = '\033[7m\033[1m\033[91m'
     reset = '\033[m'
-    format = "%(asctime)s %(levelname)s %(message)s" # (%(filename)s:%(funcName)s:%(lineno)d)"
+    format = "%(asctime)s %(levelname)s %(message)s"
     FORMATTERS = {
         logging.DEBUG: logging.Formatter(grey + format + reset),
         logging.INFO: logging.Formatter(format),
@@ -468,7 +468,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView_contextMenu.addAction(reload_sound_action)
         reload_sound_action.triggered.connect(self.reload_sound)
         self.state = SoundState.STOPPED
-        # keyboard shortcuts
         tableView_return_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Return), self.tableView)
         tableView_enter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Enter), self.tableView)
         tableView_return_shortcut.setContext(QtCore.Qt.WidgetShortcut)
