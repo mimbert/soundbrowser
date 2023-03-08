@@ -152,7 +152,6 @@ def parse_tag_list(taglist):
     if len(tmp) > 0:
         containers[None] = tmp
         tmp = {}
-    # LOG.debug(f"tag_list: {containers}")
     return containers
 
 def get_milliseconds_suffix(secs):
@@ -226,7 +225,6 @@ class SoundManager():
         Gst.init(None)
 
     def get(self, path, force_reload=False ):
-        # LOG.debug(f"sound manager get {path}")
         if path in self._cache and not force_reload:
             if not os.path.isfile(path):
                 del self._cache[path]
@@ -238,7 +236,6 @@ class SoundManager():
                 #TODO il va y avoir un souci ici
                 #sound.stop()
                 return self._load(path)
-            # LOG.debug(f"sound in cache, using it: {sound}")
             return sound
         else:
             LOG.debug(f"sound not in cache, or reload forced, load it: {path}")
@@ -401,55 +398,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.disable_seek_pos_updates()
         LOG.debug(f"sound reached end")
 
-    # def player_set_state_with_callback(self, state, callback_tuple):
-    #     self.gst_async_done_callbacks.append(callback_tuple)
-    #     return self.player.set_state(state)
-
-    # def player_set_state_blocking(self, state):
-    #     r = self.player.set_state(state)
-    #     if r == Gst.StateChangeReturn.ASYNC:
-    #         retcode, state, pending_state = self.player.get_state(BLOCKING_GET_STATE_TIMEOUT)
-    #         if retcode == Gst.StateChangeReturn.FAILURE:
-    #             LOG.warning(f"gst async state change failure after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
-    #             log_callstack()
-    #         elif retcode == Gst.StateChangeReturn.ASYNC:
-    #             LOG.warning(f"gst async state change still async after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
-    #             log_callstack()
-    #         return retcode
-    #     return r
-
-    # def wait_state_stable(self):
-    #     while True:
-    #         LOG.debug(f"wait state stable")
-    #         retcode, state, pending_state = self.player.get_state(Gst.CLOCK_TIME_NONE)
-    #         print(f"retcode = {retcode}, state = {state}, pending_state = {pending_state}")
-    #         if retcode == Gst.StateChangeReturn.SUCCESS:
-    #             print(f"ok no more pending state changes")
-    #             return retcode, state, pending_state
-
-    # def safe_seek(self, rate, format, flags, start_type, start, stop_type, stop):
-    #     while True:
-    #         retcode, state, pending_state = wait_state_stable(self.player)
-    #         if (state == Gst.State.PAUSED
-    #             or (state == Gst.State.PLAYING
-    #                 and flags & Gst.SeekFlags.FLUSH)):
-    #             break
-    #     return self.player.seek(rate, format, flags, start_type, start, stop_type, stop)
-
     def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
         self.gst_async_done_callbacks.append(callback_tuple)
         self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
-
-    # def player_seek_blocking(self, rate, formt, flags, start_type, start, stop_type, stop):
-    #     finished = threading.Event()
-    #     self.player_seek_with_callback(rate, formt, flags, start_type, start, stop_type, stop,
-    #                                    (lambda: finished.set(), [], {}))
-    #     timeout = BLOCKING_GET_STATE_TIMEOUT / (Gst.MSECOND * 1000.0)
-    #     if not finished.wait(timeout):
-    #         LOG.warning(f"wait for seek completion failure after timeout of {timeout}s.")
-    #         log_callstack()
-    #         return False
-    #     return True
 
     def update_metadata_field(self, field, value, force = None):
         f = getattr(self, field)
@@ -898,42 +849,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def slider_mouseReleaseEvent(self, mouse_event):
         self.slider_seek_to_pos()
-
-    # def start_sound(self, path, position=None):
-    #     sound = self.manager.get(path)
-    #     if sound:
-    #         if self.currently_playing:
-    #             if self.currently_playing != path:
-    #                 self.stop_sound()
-    #                 uri = pathlib.Path(path).as_uri()
-    #                 self.player.set_property('uri', uri)
-    #         else:
-    #             uri = pathlib.Path(path).as_uri()
-    #             self.player.set_property('uri', uri)
-    #         self._play(position)
-    #         self.locationBar.setText(path)
-    #         self.update_metadata_pane(sound.metadata)
-    #         self.state = SoundState.PLAYING, path
-
-    # def pause_sound(self):
-    #     if self.currently_playing:
-    #         sound = self.manager.get(self.currently_playing)
-    #         if sound:
-    #             if self.state == SoundState.PLAYING:
-    #                 self._pause()
-    #                 self.state = SoundState.PAUSED
-    #             elif self.state == SoundState.PAUSED:
-    #                 self._play()
-    #                 self.state = SoundState.PLAYING
-
-    # def stop_sound(self, path=None):
-    #     if path == None: path = self.currently_playing
-    #     if path:
-    #         sound = self.manager.get(path)
-    #         if sound:
-    #             self._stop()
-    #         if path == self.currently_playing:
-    #             self.state = SoundState.STOPPED
 
     def _update_player_path(self, sound):
         LOG.debug(f"update_player_path to {sound.path}")
