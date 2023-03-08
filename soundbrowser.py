@@ -353,7 +353,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self._state = value
         if value == SoundState.STOPPED:
             self.play_button.setIcon(self.play_icon)
-            self._update_ui_to_selection()
+            self.update_ui_to_selection()
         elif value == SoundState.PLAYING:
             self.play_button.setIcon(self.pause_icon)
             self.play_button.setEnabled(True)
@@ -496,7 +496,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.image.setFixedWidth(self.metadata.height())
         self.image.setFixedHeight(self.metadata.height())
 
-    def _update_ui_to_selection(self):
+    def update_ui_to_selection(self):
         if self.current_sound_selected:
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
@@ -524,7 +524,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             self.current_sound_selected = None
         if self.state == SoundState.STOPPED:
-            self._update_ui_to_selection()
+            self.update_ui_to_selection()
 
     def update_metadata_field(self, field, value, force = None):
         f = getattr(self, field)
@@ -760,7 +760,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def slider_mouseReleaseEvent(self, mouse_event):
         self.slider_seek_to_pos()
 
-    def _notify_sound_stopped(self):
+    def notify_sound_stopped(self):
         self.state = SoundState.STOPPED
         self.disable_seek_pos_updates()
         LOG.debug(f"sound reached end")
@@ -784,7 +784,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
             else:
-                self._notify_sound_stopped()
+                self.notify_sound_stopped()
         elif message.type == Gst.MessageType.EOS:
             log_gst_message(message)
             if self.config['play_looped']:
@@ -798,7 +798,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                                  Gst.SeekType.NONE, 0)
                 self.player.set_state(Gst.State.PLAYING)
             else:
-                self._notify_sound_stopped()
+                self.notify_sound_stopped()
         elif message.type == Gst.MessageType.TAG:
             message_struct = message.get_structure()
             taglist = message.parse_tag()
@@ -825,7 +825,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.seek_slider.setValue(position * 100.0 / duration)
                 self.seek_slider.blockSignals(signals_blocked)
                 if position >= duration and not self.config['play_looped']:
-                    self._notify_sound_stopped()
+                    self.notify_sound_stopped()
 
     def enable_seek_pos_updates(self):
         LOG.debug(f"enable seek pos updates")
@@ -846,7 +846,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         except:
             pass
 
-    def _update_player_path(self, sound):
+    def update_player_path(self, sound):
         LOG.debug(f"update_player_path to {sound.path}")
         self.player.set_state(Gst.State.NULL)
         uri = pathlib.Path(sound.path).as_uri()
@@ -866,7 +866,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.player.set_state(Gst.State.PAUSED)
         if self.state == SoundState.STOPPED:
             if self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
-                self._update_player_path(self.current_sound_selected)
+                self.update_player_path(self.current_sound_selected)
             self.player.set_state(Gst.State.PAUSED)
             if self.config['play_looped']:
                 self.player.seek(1.0,
@@ -881,7 +881,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                                  Gst.SeekType.SET, 0,
                                  Gst.SeekType.NONE, 0)
         if start_pos != None:
-            self._actual_seek(start_pos)
+            self.actual_seek(start_pos)
         self.player.set_state(Gst.State.PLAYING)
         self.state = SoundState.PLAYING
         self.enable_seek_pos_updates()
@@ -923,21 +923,21 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             LOG.debug(f"seek to {position} delayed to limit gst seek events frequency")
             self.seek_next_value = position
         else:
-            self._actual_seek(position)
+            self.actual_seek(position)
             self.seek_next_value = None
             self.seek_min_interval_timer = QtCore.QTimer()
             self.seek_min_interval_timer.setSingleShot(True)
-            self.seek_min_interval_timer.timeout.connect(self._seek_min_interval_timer_fired)
+            self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
             self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
 
     @QtCore.Slot()
-    def _seek_min_interval_timer_fired(self):
+    def seek_min_interval_timer_fired(self):
         if self.seek_next_value:
-            self._actual_seek(self.seek_next_value)
+            self.actual_seek(self.seek_next_value)
         self.seek_next_value = None
         self.seek_min_interval_timer = None
 
-    def _actual_seek(self, position):
+    def actual_seek(self, position):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         if got_duration:
             seek_pos = position * duration / 100.0
