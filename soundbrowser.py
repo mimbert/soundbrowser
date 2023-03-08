@@ -743,7 +743,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def stop_clicked(self, checked):
         self.stop()
 
-    def slider_seek_to_pos(self):
+    def slider_seek_to_pos(self, mouse_event):
         position = QtWidgets.QStyle.sliderValueFromPosition(self.seek_slider.minimum(), self.seek_slider.maximum(), mouse_event.pos().x(), self.seek_slider.geometry().width())
         if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
             self.seek(position)
@@ -752,13 +752,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.play(position)
 
     def slider_mousePressEvent(self, mouse_event):
-        self.slider_seek_to_pos()
+        self.slider_seek_to_pos(mouse_event)
 
     def slider_mouseMoveEvent(self, mouse_event):
-        self.slider_seek_to_pos()
+        self.slider_seek_to_pos(mouse_event)
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        self.slider_seek_to_pos()
+        self.slider_seek_to_pos(mouse_event)
 
     def notify_sound_stopped(self):
         self.state = SoundState.STOPPED
