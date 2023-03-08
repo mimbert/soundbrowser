@@ -352,16 +352,16 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def state(self, value):
         self._state = value
         if value == SoundState.STOPPED:
-            self.play.setIcon(self.play_icon)
+            self.play_button.setIcon(self.play_icon)
             self._update_ui_to_selection()
         elif value == SoundState.PLAYING:
-            self.play.setIcon(self.pause_icon)
-            self.play.setEnabled(True)
-            self.stop.setEnabled(True)
+            self.play_button.setIcon(self.pause_icon)
+            self.play_button.setEnabled(True)
+            self.stop_button.setEnabled(True)
         elif value == SoundState.PAUSED:
-            self.play.setIcon(self.play_icon)
-            self.play.setEnabled(True)
-            self.stop.setEnabled(True)
+            self.play_button.setIcon(self.play_icon)
+            self.play_button.setEnabled(True)
+            self.stop_button.setEnabled(True)
 
     def clean_close(self):
         self.config['main_window_geometry'] = self.saveGeometry().data()
@@ -438,21 +438,21 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
         self.locationBar.returnPressed.connect(self.locationBar_return_pressed)
-        self.prefsButton.clicked.connect(self.prefs_button_clicked)
-        self.seek.mousePressEvent = self.slider_mousePressEvent
-        self.seek.mouseMoveEvent = self.slider_mouseMoveEvent
-        self.seek.mouseReleaseEvent = self.slider_mouseReleaseEvent
-        self.loop.setChecked(self.config['play_looped'])
-        self.show_hidden_files.setChecked(self.config['show_hidden_files'])
-        self.show_metadata_pane.setChecked(self.config['show_metadata_pane'])
-        self.filter_files.setChecked(self.config['filter_files'])
-        self.loop.clicked.connect(self.loop_clicked)
-        self.show_hidden_files.clicked.connect(self.show_hidden_files_clicked)
-        self.show_metadata_pane.clicked.connect(self.show_metadata_pane_clicked)
-        self.filter_files.clicked.connect(self.filter_files_clicked)
-        self.copy_path.clicked.connect(self.copy_path_clicked)
-        self.play.clicked.connect(self.play_clicked)
-        self.stop.clicked.connect(self.stop_clicked)
+        self.prefs_button.clicked.connect(self.prefs_button_clicked)
+        self.seek_slider.mousePressEvent = self.slider_mousePressEvent
+        self.seek_slider.mouseMoveEvent = self.slider_mouseMoveEvent
+        self.seek_slider.mouseReleaseEvent = self.slider_mouseReleaseEvent
+        self.loop_button.setChecked(self.config['play_looped'])
+        self.show_hidden_files_button.setChecked(self.config['show_hidden_files'])
+        self.show_metadata_pane_button.setChecked(self.config['show_metadata_pane'])
+        self.filter_files_button.setChecked(self.config['filter_files'])
+        self.loop_button.clicked.connect(self.loop_clicked)
+        self.show_hidden_files_button.clicked.connect(self.show_hidden_files_clicked)
+        self.show_metadata_pane_button.clicked.connect(self.show_metadata_pane_clicked)
+        self.filter_files_button.clicked.connect(self.filter_files_clicked)
+        self.copy_path_button.clicked.connect(self.copy_path_clicked)
+        self.play_button.clicked.connect(self.play_clicked)
+        self.stop_button.clicked.connect(self.stop_clicked)
         self.pause_icon = QtGui.QIcon(":/icons/pause.png")
         self.play_icon = QtGui.QIcon(":/icons/play.png")
         self.play_icon.addFile(":/icons/play_disabled.png", mode=QtGui.QIcon.Disabled)
@@ -498,15 +498,15 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def _update_ui_to_selection(self):
         if self.current_sound_selected:
-            self.play.setEnabled(True)
-            self.stop.setEnabled(True)
-            self.seek.setEnabled(True)
-            self.seek.setValue(0)
+            self.play_button.setEnabled(True)
+            self.stop_button.setEnabled(True)
+            self.seek_slider.setEnabled(True)
+            self.seek_slider.setValue(0)
         else:
-            self.play.setEnabled(False)
-            self.stop.setEnabled(False)
-            self.seek.setEnabled(False)
-            self.seek.setValue(0)
+            self.play_button.setEnabled(False)
+            self.stop_button.setEnabled(False)
+            self.seek_slider.setEnabled(False)
+            self.seek_slider.setValue(0)
 
     def select_path(self):
         # est-ce que je teste si il y a une sélection de taille 1 ou est-ce le code appelant? plutôt le code appelant à priori?
@@ -619,7 +619,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.treeView.setCurrentIndex(self.fs_model.index(path))
                 self.treeView.expand(self.fs_model.index(path))
             elif fileinfo.isFile():
-                self.play_sound()
+                self.play()
 
     def tableview_clicked(self, index):
         self.tableView_return_pressed()
@@ -696,27 +696,27 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def reload_sound(self):
         # todo: voir tableView_contextMenuEvent
         path = self.tableView_contextMenu.path_to_reload
-        self.stop_sound()
+        self.stop()
         self.manager.get(path, force_reload=True)
-        self.play_sound()
+        self.play()
 
     def loop_shortcut_activated(self):
-        self.loop.click()
+        self.loop_button.click()
 
     def metadata_shortcut_activated(self):
-        self.show_metadata_pane.click()
+        self.show_metadata_pane_button.click()
 
     def hidden_shortcut_activated(self):
-        self.show_hidden_files.click()
+        self.show_hidden_files_button.click()
 
     def filter_shortcut_activated(self):
-        self.filter_files.click()
+        self.filter_files_button.click()
 
     def play_shortcut_activated(self):
-        self.play.click()
+        self.play_button.click()
 
     def stop_shortcut_activated(self):
-        self.stop.click()
+        self.stop_button.click()
 
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
@@ -736,17 +736,17 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def play_clicked(self, checked):
         if self.state == SoundState.STOPPED:
-            self.play_sound()
+            self.play()
         else:
-            self.pause_sound()
+            self.pause()
 
     def stop_clicked(self, checked):
-        self.stop_sound()
+        self.stop()
 
     def slider_seek_to_pos(self):
-        position = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
+        position = QtWidgets.QStyle.sliderValueFromPosition(self.seek_slider.minimum(), self.seek_slider.maximum(), mouse_event.pos().x(), self.seek_slider.geometry().width())
         if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
-            self.seek_sound(position)
+            self.seek(position)
         if self.state == SoundState.STOPPED:
             if self.current_sound_selected:
                 self.play(position)
@@ -821,9 +821,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.current_sound_playing.metadata[None]['duration'] = self.current_sound_playing.metadata['all']['duration'] = duration
                 self.update_metadata_pane(self.current_sound_playing.metadata)
             if got_position:
-                signals_blocked = self.seek.blockSignals(True)
-                self.seek.setValue(position * 100.0 / duration)
-                self.seek.blockSignals(signals_blocked)
+                signals_blocked = self.seek_slider.blockSignals(True)
+                self.seek_slider.setValue(position * 100.0 / duration)
+                self.seek_slider.blockSignals(signals_blocked)
                 if position >= duration and not self.config['play_looped']:
                     self._notify_sound_stopped()
 
@@ -853,13 +853,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.set_property('uri', uri)
         self.current_sound_playing = sound
 
-    def play_sound(self, start_pos=None):
+    def play(self, start_pos=None):
         LOG.debug(f"play {self}")
         if self.state == SoundState.PAUSED:
-            LOG.error(f"play_sound called with state = {self.state.name}")
+            LOG.error(f"play called with state = {self.state.name}")
             return
         if (not self.current_sound_selected) and (not self.current_sound_playing):
-            LOG.error(f"play_sound called with no sound selected nor playing")
+            LOG.error(f"play called with no sound selected nor playing")
             return
         if self.state == SoundState.PLAYING:
             self.state = SoundState.STOPPED
@@ -886,13 +886,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.state = SoundState.PLAYING
         self.enable_seek_pos_updates()
 
-    def pause_sound(self):
+    def pause(self):
         LOG.debug(f"pause {self}")
         if not self.state == SoundState.PLAYING:
-            LOG.error(f"pause_sound called with state = {self.state.name}")
+            LOG.error(f"pause called with state = {self.state.name}")
             return
         if not self.current_sound_playing:
-            LOG.error(f"pause_sound called with current_sound_playing = {self.current_sound_playing}")
+            LOG.error(f"pause called with current_sound_playing = {self.current_sound_playing}")
             return
         self.player.set_state(Gst.State.PAUSED)
         self.state = SoundState.PAUSED
@@ -902,7 +902,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.gst_async_done_callbacks.append(callback_tuple)
         self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
 
-    def stop_sound(self):
+    def stop(self):
         LOG.debug(f"stop {self}")
         self.player.set_state(Gst.State.PAUSED)
         self.player_seek_with_callback(1.0,
@@ -913,11 +913,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                                        (self.disable_seek_pos_updates, [], {}))
         self.state = SoundState.STOPPED
         self._current_sound_playing = None
-        signals_blocked = self.seek.blockSignals(True)
-        self.seek.setValue(0.0)
-        self.seek.blockSignals(signals_blocked)
+        signals_blocked = self.seek_slider.blockSignals(True)
+        self.seek_slider.setValue(0.0)
+        self.seek_slider.blockSignals(signals_blocked)
 
-    def seek_sound(self, position):
+    def seek(self, position):
         LOG.debug(f"seek to {position} {self}")
         if self.seek_min_interval_timer != None:
             LOG.debug(f"seek to {position} delayed to limit gst seek events frequency")
