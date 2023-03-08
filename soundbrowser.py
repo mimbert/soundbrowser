@@ -344,18 +344,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def __str__(self):
         return f"SoundBrowser <state={self.state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
 
-    def _update_ui_to_selection(self):
-        if self.current_sound_selected:
-            self.play.setEnabled(True)
-            self.stop.setEnabled(True)
-            self.seek.setEnabled(True)
-            self.seek.setValue(0)
-        else:
-            self.play.setEnabled(False)
-            self.stop.setEnabled(False)
-            self.seek.setEnabled(False)
-            self.seek.setValue(0)
-
     @property
     def state(self):
         return self._state
@@ -374,154 +362,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.play.setIcon(self.play_icon)
             self.play.setEnabled(True)
             self.stop.setEnabled(True)
-
-    def select_path(self):
-        # est-ce que je teste si il y a une sélection de taille 1 ou est-ce le code appelant? plutôt le code appelant à priori?
-        # est-ce que je vais chercher self.tableView.currentIndex() ou j'utilise un param index?
-        # lorsque c'est un dir qui est sélectionné est ce que cette fonction est appelée?
-        fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
-        filepath = self.tableview_get_path(self.tableView.currentIndex())
-        self.locationBar.setText(filepath)
-        if fileinfo.isFile():
-            self.current_sound_selected = self.manager.get(filepath)
-            if self.current_sound_selected:
-                self.update_metadata_pane(self.current_sound_selected.metadata)
-            else:
-                self.clear_metadata_pane()
-        else:
-            self.current_sound_selected = None
-        if self.state == SoundState.STOPPED:
-            self._update_ui_to_selection()
-
-    def _notify_sound_stopped(self):
-        self.state = SoundState.STOPPED
-        self.disable_seek_pos_updates()
-        LOG.debug(f"sound reached end")
-
-    def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
-        self.gst_async_done_callbacks.append(callback_tuple)
-        self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
-
-    def update_metadata_field(self, field, value, force = None):
-        f = getattr(self, field)
-        l = getattr(self, field + '_label')
-        if value or force == True:
-            f.setText(str(value))
-            f.setEnabled(True)
-            l.setEnabled(True)
-        if not value or force == False:
-            f.setText(str(value))
-            f.setEnabled(False)
-            l.setEnabled(False)
-
-    @QtCore.Slot()
-    def update_metadata_pane_to_current_playing(self):
-        self.update_metadata_pane(self.current_sound_playing.metadata)
-
-    def update_metadata_pane(self, metadata):
-        m = metadata['all']
-        self.update_metadata_field('title', m.get('title', ''))
-        self.update_metadata_field('artist', m.get('artist', ''))
-        self.update_metadata_field('album', m.get('album', ''))
-        self.update_metadata_field('album_artist', m.get('album-artist', ''))
-        self.update_metadata_field('track', str(m.get('track-number', '?')) + '/' + str(m.get('track-count', '?')),
-                                   True if ('track-number' in m or 'track-count' in m) else False)
-        self.update_metadata_field('duration', format_duration(m.get('duration')))
-        self.update_metadata_field('genre', m.get('genre', ''))
-        self.update_metadata_field('date', m.get('datetime', ''))
-        self.update_metadata_field('bpm', f"{m['beats-per-minute']:.2f}" if 'beats-per-minute' in m else '')
-        self.update_metadata_field('key', m.get('musical-key', ''))
-        self.update_metadata_field('channel_mode', m.get('channel-mode', ''))
-        self.update_metadata_field('audio_codec', m.get('audio-codec', ''))
-        self.update_metadata_field('encoder', m.get('encoder', ''))
-        self.update_metadata_field('bitrate', str(m.get('bitrate', '?')) + ' (min=' + str(m.get('minimum-bitrate', '?')) + '/max=' + str(m.get('maximum-bitrate', '?')) + ')',
-                                   True if 'bitrate' in m else False)
-        self.update_metadata_field('comment', m.get('comment', ''))
-        if m.get('image'):
-            set_pixmap(self.image, m.get('image'))
-        else:
-            self.image.setPixmap(None)
-
-    def gst_bus_message_handler(self, bus, message, *user_data):
-        if message.type == Gst.MessageType.ASYNC_DONE:
-            for callback in self.gst_async_done_callbacks:
-                func = callback[0]
-                args = callback[1]
-                kwargs = callback[2]
-                LOG.debug(f"ASYNC_DONE, calling {func.__name__} with args {args} kwargs {kwargs}")
-                func(*args, **kwargs)
-            self.gst_async_done_callbacks.clear()
-        elif message.type == Gst.MessageType.SEGMENT_DONE:
-            log_gst_message(message)
-            if self.config['play_looped']:
-                # normal looping when no seeking has been done
-                self.player.seek(1.0,
-                                 Gst.Format.TIME,
-                                 Gst.SeekFlags.SEGMENT,
-                                 Gst.SeekType.SET, 0,
-                                 Gst.SeekType.NONE, 0)
-            else:
-                self._notify_sound_stopped()
-        elif message.type == Gst.MessageType.EOS:
-            log_gst_message(message)
-            if self.config['play_looped']:
-                # playing looped but a seek was done while playing
-                # so must do a full restart of the stream
-                self.player.set_state(Gst.State.PAUSED)
-                self.player.seek(1.0,
-                                 Gst.Format.TIME,
-                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                                 Gst.SeekType.SET, 0,
-                                 Gst.SeekType.NONE, 0)
-                self.player.set_state(Gst.State.PLAYING)
-            else:
-                self._notify_sound_stopped()
-        elif message.type == Gst.MessageType.TAG:
-            message_struct = message.get_structure()
-            taglist = message.parse_tag()
-            metadata = parse_tag_list(taglist)
-            self.current_sound_playing.update_metadata(metadata)
-            self.update_metadata_to_current_playing_message.emit()
-        elif message.type == Gst.MessageType.WARNING:
-            LOG.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
-        elif message.type == Gst.MessageType.ERROR:
-            LOG.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
-        return True
-
-    @QtCore.Slot()
-    def seek_position_updater(self):
-        got_duration, duration = self.player.query_duration(Gst.Format.TIME)
-        got_position, position = self.player.query_position(Gst.Format.TIME)
-        # LOG.debug(cyan(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}"))
-        if got_duration:
-            if 'duration' not in self.current_sound_playing.metadata[None] or 'duration' not in self.current_sound_playing.metadata['all']:
-                self.current_sound_playing.metadata[None]['duration'] = self.current_sound_playing.metadata['all']['duration'] = duration
-                self.update_metadata_pane(self.current_sound_playing.metadata)
-            if got_position:
-                signals_blocked = self.seek.blockSignals(True)
-                self.seek.setValue(position * 100.0 / duration)
-                self.seek.blockSignals(signals_blocked)
-                if position >= duration and not self.config['play_looped']:
-                    self._notify_sound_stopped()
-
-    def enable_seek_pos_updates(self):
-        LOG.debug(f"enable seek pos updates")
-        self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
-        self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
-
-    def disable_seek_pos_updates(self):
-        LOG.debug(f"disable seek pos updates")
-        self.seek_pos_update_timer.stop()
-        # following block added because sometimes, when the sound
-        # reaches its end, it looks like even though
-        # disable_seek_pos_updates is called before the seek to the
-        # beginning, there may still be a seek_position_updater call
-        # occuring after, which causes the slider to reset to zero
-        # anyway
-        try:
-            self.seek_pos_update_timer.timeout.disconnect(self.seek_position_updater)
-        except:
-            pass
 
     def clean_close(self):
         self.config['main_window_geometry'] = self.saveGeometry().data()
@@ -652,6 +492,52 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clear_metadata_pane()
         self.tableView.setFocus()
 
+    def showEvent(self, event):
+        self.image.setFixedWidth(self.metadata.height())
+        self.image.setFixedHeight(self.metadata.height())
+
+    def _update_ui_to_selection(self):
+        if self.current_sound_selected:
+            self.play.setEnabled(True)
+            self.stop.setEnabled(True)
+            self.seek.setEnabled(True)
+            self.seek.setValue(0)
+        else:
+            self.play.setEnabled(False)
+            self.stop.setEnabled(False)
+            self.seek.setEnabled(False)
+            self.seek.setValue(0)
+
+    def select_path(self):
+        # est-ce que je teste si il y a une sélection de taille 1 ou est-ce le code appelant? plutôt le code appelant à priori?
+        # est-ce que je vais chercher self.tableView.currentIndex() ou j'utilise un param index?
+        # lorsque c'est un dir qui est sélectionné est ce que cette fonction est appelée?
+        fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+        filepath = self.tableview_get_path(self.tableView.currentIndex())
+        self.locationBar.setText(filepath)
+        if fileinfo.isFile():
+            self.current_sound_selected = self.manager.get(filepath)
+            if self.current_sound_selected:
+                self.update_metadata_pane(self.current_sound_selected.metadata)
+            else:
+                self.clear_metadata_pane()
+        else:
+            self.current_sound_selected = None
+        if self.state == SoundState.STOPPED:
+            self._update_ui_to_selection()
+
+    def update_metadata_field(self, field, value, force = None):
+        f = getattr(self, field)
+        l = getattr(self, field + '_label')
+        if value or force == True:
+            f.setText(str(value))
+            f.setEnabled(True)
+            l.setEnabled(True)
+        if not value or force == False:
+            f.setText(str(value))
+            f.setEnabled(False)
+            l.setEnabled(False)
+
     def clear_metadata_pane(self):
         for field, default_val in [
                 ('title', ''),
@@ -675,9 +561,33 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             getattr(self, field + '_label').setEnabled(False)
         self.image.setPixmap(None)
 
-    def showEvent(self, event):
-        self.image.setFixedWidth(self.metadata.height())
-        self.image.setFixedHeight(self.metadata.height())
+    def update_metadata_pane(self, metadata):
+        m = metadata['all']
+        self.update_metadata_field('title', m.get('title', ''))
+        self.update_metadata_field('artist', m.get('artist', ''))
+        self.update_metadata_field('album', m.get('album', ''))
+        self.update_metadata_field('album_artist', m.get('album-artist', ''))
+        self.update_metadata_field('track', str(m.get('track-number', '?')) + '/' + str(m.get('track-count', '?')),
+                                   True if ('track-number' in m or 'track-count' in m) else False)
+        self.update_metadata_field('duration', format_duration(m.get('duration')))
+        self.update_metadata_field('genre', m.get('genre', ''))
+        self.update_metadata_field('date', m.get('datetime', ''))
+        self.update_metadata_field('bpm', f"{m['beats-per-minute']:.2f}" if 'beats-per-minute' in m else '')
+        self.update_metadata_field('key', m.get('musical-key', ''))
+        self.update_metadata_field('channel_mode', m.get('channel-mode', ''))
+        self.update_metadata_field('audio_codec', m.get('audio-codec', ''))
+        self.update_metadata_field('encoder', m.get('encoder', ''))
+        self.update_metadata_field('bitrate', str(m.get('bitrate', '?')) + ' (min=' + str(m.get('minimum-bitrate', '?')) + '/max=' + str(m.get('maximum-bitrate', '?')) + ')',
+                                   True if 'bitrate' in m else False)
+        self.update_metadata_field('comment', m.get('comment', ''))
+        if m.get('image'):
+            set_pixmap(self.image, m.get('image'))
+        else:
+            self.image.setPixmap(None)
+
+    @QtCore.Slot()
+    def update_metadata_pane_to_current_playing(self):
+        self.update_metadata_pane(self.current_sound_playing.metadata)
 
     def dir_model_directory_loaded(self, path):
         self.tableView.resizeColumnToContents(0)
@@ -689,41 +599,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setCurrentIndex(self.fs_model.index(path))
         self.treeView.expand(self.fs_model.index(path))
 
-    def play_clicked(self, checked):
-        if self.state == SoundState.STOPPED:
-            self.play_sound()
-        else:
-            self.pause_sound()
-
-    def stop_clicked(self, checked):
-        self.stop_sound()
-
     def tableview_get_path(self, index):
         return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
-
-    def locationBar_return_pressed(self):
-        directory, filename = split_path_filename(self.locationBar.text())
-        if directory:
-            self.treeView.setCurrentIndex(self.fs_model.index(directory))
-            self.treeView.expand(self.fs_model.index(directory))
-
-    def loop_shortcut_activated(self):
-        self.loop.click()
-
-    def metadata_shortcut_activated(self):
-        self.show_metadata_pane.click()
-
-    def hidden_shortcut_activated(self):
-        self.show_hidden_files.click()
-
-    def filter_shortcut_activated(self):
-        self.filter_files.click()
-
-    def play_shortcut_activated(self):
-        self.play.click()
-
-    def stop_shortcut_activated(self):
-        self.stop.click()
 
     def tableview_selection_changed(self, selected, deselected):
         LOG.debug(f"tableview_selection_changed  len(selected)={len(selected)}")
@@ -746,6 +623,47 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def tableview_clicked(self, index):
         self.tableView_return_pressed()
+
+    def locationBar_return_pressed(self):
+        directory, filename = split_path_filename(self.locationBar.text())
+        if directory:
+            self.treeView.setCurrentIndex(self.fs_model.index(directory))
+            self.treeView.expand(self.fs_model.index(directory))
+
+    def mainwin_paste(self):
+        directory, filename = split_path_filename(self.clipboard.text())
+        if directory:
+            self.treeView.setCurrentIndex(self.fs_model.index(directory))
+            self.treeView.expand(self.fs_model.index(directory))
+
+    def copy_path_clicked(self, checked = False):
+        self.locationBar.setSelection(0, len(self.locationBar.text()))
+        self.clipboard.setText(self.locationBar.text())
+
+    def prefs_button_clicked(self, checked = False):
+        prefs = PrefsDialog(self)
+        prefs.file_extensions_filter.setText(' '.join(self.config['file_extensions_filter']))
+        prefs.specified_dir.setText(self.config['specified_dir'])
+        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
+            prefs.startup_dir_mode_specified_dir.setChecked(True)
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
+            prefs.startup_dir_mode_last_dir.setChecked(True)
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
+            prefs.startup_dir_mode_current_dir.setChecked(True)
+        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
+            prefs.startup_dir_mode_home_dir.setChecked(True)
+        if prefs.exec_():
+            if prefs.startup_dir_mode_specified_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_SPECIFIED_DIR
+            elif prefs.startup_dir_mode_last_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_LAST_DIR
+            elif prefs.startup_dir_mode_current_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_CURRENT_DIR
+            elif prefs.startup_dir_mode_home_dir.isChecked():
+                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_HOME_DIR
+            self.config['specified_dir'] = prefs.specified_dir.text()
+            self.config['file_extensions_filter'] = prefs.file_extensions_filter.text().split(' ')
+            self.refresh_config()
 
     def tableView_contextMenuEvent(self, event):
         # todo:
@@ -775,12 +693,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.tableView_contextMenu.path_to_reload = path
                 self.tableView_contextMenu.popup(QtGui.QCursor.pos())
 
-    def mainwin_paste(self):
-        directory, filename = split_path_filename(self.clipboard.text())
-        if directory:
-            self.treeView.setCurrentIndex(self.fs_model.index(directory))
-            self.treeView.expand(self.fs_model.index(directory))
-
     def reload_sound(self):
         # todo: voir tableView_contextMenuEvent
         path = self.tableView_contextMenu.path_to_reload
@@ -788,15 +700,33 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.manager.get(path, force_reload=True)
         self.play_sound()
 
+    def loop_shortcut_activated(self):
+        self.loop.click()
+
+    def metadata_shortcut_activated(self):
+        self.show_metadata_pane.click()
+
+    def hidden_shortcut_activated(self):
+        self.show_hidden_files.click()
+
+    def filter_shortcut_activated(self):
+        self.filter_files.click()
+
+    def play_shortcut_activated(self):
+        self.play.click()
+
+    def stop_shortcut_activated(self):
+        self.stop.click()
+
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
 
-    def show_hidden_files_clicked(self, checked = False):
-        self.config['show_hidden_files'] = checked
-        self.refresh_config()
-
     def show_metadata_pane_clicked(self, checked = False):
         self.config['show_metadata_pane'] = checked
+        self.refresh_config()
+
+    def show_hidden_files_clicked(self, checked = False):
+        self.config['show_hidden_files'] = checked
         self.refresh_config()
 
     def filter_files_clicked(self, checked = False):
@@ -804,34 +734,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.refresh_config()
         self.dir_proxy_model.invalidateFilter()
 
-    def prefs_button_clicked(self, checked = False):
-        prefs = PrefsDialog(self)
-        prefs.file_extensions_filter.setText(' '.join(self.config['file_extensions_filter']))
-        prefs.specified_dir.setText(self.config['specified_dir'])
-        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
-            prefs.startup_dir_mode_specified_dir.setChecked(True)
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
-            prefs.startup_dir_mode_last_dir.setChecked(True)
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
-            prefs.startup_dir_mode_current_dir.setChecked(True)
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
-            prefs.startup_dir_mode_home_dir.setChecked(True)
-        if prefs.exec_():
-            if prefs.startup_dir_mode_specified_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_SPECIFIED_DIR
-            elif prefs.startup_dir_mode_last_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_LAST_DIR
-            elif prefs.startup_dir_mode_current_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_CURRENT_DIR
-            elif prefs.startup_dir_mode_home_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_HOME_DIR
-            self.config['specified_dir'] = prefs.specified_dir.text()
-            self.config['file_extensions_filter'] = prefs.file_extensions_filter.text().split(' ')
-            self.refresh_config()
+    def play_clicked(self, checked):
+        if self.state == SoundState.STOPPED:
+            self.play_sound()
+        else:
+            self.pause_sound()
 
-    def copy_path_clicked(self, checked = False):
-        self.locationBar.setSelection(0, len(self.locationBar.text()))
-        self.clipboard.setText(self.locationBar.text())
+    def stop_clicked(self, checked):
+        self.stop_sound()
 
     def slider_seek_to_pos(self):
         position = QtWidgets.QStyle.sliderValueFromPosition(self.seek.minimum(), self.seek.maximum(), mouse_event.pos().x(), self.seek.geometry().width())
@@ -849,6 +759,92 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def slider_mouseReleaseEvent(self, mouse_event):
         self.slider_seek_to_pos()
+
+    def _notify_sound_stopped(self):
+        self.state = SoundState.STOPPED
+        self.disable_seek_pos_updates()
+        LOG.debug(f"sound reached end")
+
+    def gst_bus_message_handler(self, bus, message, *user_data):
+        if message.type == Gst.MessageType.ASYNC_DONE:
+            for callback in self.gst_async_done_callbacks:
+                func = callback[0]
+                args = callback[1]
+                kwargs = callback[2]
+                LOG.debug(f"ASYNC_DONE, calling {func.__name__} with args {args} kwargs {kwargs}")
+                func(*args, **kwargs)
+            self.gst_async_done_callbacks.clear()
+        elif message.type == Gst.MessageType.SEGMENT_DONE:
+            log_gst_message(message)
+            if self.config['play_looped']:
+                # normal looping when no seeking has been done
+                self.player.seek(1.0,
+                                 Gst.Format.TIME,
+                                 Gst.SeekFlags.SEGMENT,
+                                 Gst.SeekType.SET, 0,
+                                 Gst.SeekType.NONE, 0)
+            else:
+                self._notify_sound_stopped()
+        elif message.type == Gst.MessageType.EOS:
+            log_gst_message(message)
+            if self.config['play_looped']:
+                # playing looped but a seek was done while playing
+                # so must do a full restart of the stream
+                self.player.set_state(Gst.State.PAUSED)
+                self.player.seek(1.0,
+                                 Gst.Format.TIME,
+                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+                                 Gst.SeekType.SET, 0,
+                                 Gst.SeekType.NONE, 0)
+                self.player.set_state(Gst.State.PLAYING)
+            else:
+                self._notify_sound_stopped()
+        elif message.type == Gst.MessageType.TAG:
+            message_struct = message.get_structure()
+            taglist = message.parse_tag()
+            metadata = parse_tag_list(taglist)
+            self.current_sound_playing.update_metadata(metadata)
+            self.update_metadata_to_current_playing_message.emit()
+        elif message.type == Gst.MessageType.WARNING:
+            LOG.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
+        elif message.type == Gst.MessageType.ERROR:
+            LOG.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+        return True
+
+    @QtCore.Slot()
+    def seek_position_updater(self):
+        got_duration, duration = self.player.query_duration(Gst.Format.TIME)
+        got_position, position = self.player.query_position(Gst.Format.TIME)
+        # LOG.debug(cyan(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}"))
+        if got_duration:
+            if 'duration' not in self.current_sound_playing.metadata[None] or 'duration' not in self.current_sound_playing.metadata['all']:
+                self.current_sound_playing.metadata[None]['duration'] = self.current_sound_playing.metadata['all']['duration'] = duration
+                self.update_metadata_pane(self.current_sound_playing.metadata)
+            if got_position:
+                signals_blocked = self.seek.blockSignals(True)
+                self.seek.setValue(position * 100.0 / duration)
+                self.seek.blockSignals(signals_blocked)
+                if position >= duration and not self.config['play_looped']:
+                    self._notify_sound_stopped()
+
+    def enable_seek_pos_updates(self):
+        LOG.debug(f"enable seek pos updates")
+        self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
+        self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
+
+    def disable_seek_pos_updates(self):
+        LOG.debug(f"disable seek pos updates")
+        self.seek_pos_update_timer.stop()
+        # following block added because sometimes, when the sound
+        # reaches its end, it looks like even though
+        # disable_seek_pos_updates is called before the seek to the
+        # beginning, there may still be a seek_position_updater call
+        # occuring after, which causes the slider to reset to zero
+        # anyway
+        try:
+            self.seek_pos_update_timer.timeout.disconnect(self.seek_position_updater)
+        except:
+            pass
 
     def _update_player_path(self, sound):
         LOG.debug(f"update_player_path to {sound.path}")
@@ -901,6 +897,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.set_state(Gst.State.PAUSED)
         self.state = SoundState.PAUSED
         self.disable_seek_pos_updates()
+
+    def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
+        self.gst_async_done_callbacks.append(callback_tuple)
+        self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
 
     def stop_sound(self):
         LOG.debug(f"stop {self}")
