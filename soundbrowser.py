@@ -734,7 +734,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.dir_proxy_model.invalidateFilter()
 
     def play_clicked(self, checked):
-        if self.state == SoundState.STOPPED:
+        if self.state in [ SoundState.STOPPED, SoundState.PAUSED ] :
             self.play()
         else:
             self.pause()
@@ -854,9 +854,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def play(self, start_pos=None):
         LOG.debug(f"play {self}")
-        if self.state == SoundState.PAUSED:
-            LOG.error(f"play called with state = {self.state.name}")
-            return
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             LOG.error(f"play called with no sound selected nor playing")
             return
