@@ -218,6 +218,14 @@ class Sound(QtCore.QObject):
             self.metadata[k].update(metadata[k])
             self.metadata['all'].update(metadata[k])
 
+def file_changed(sound):
+    try:
+        stat_result = os.stat(sound.path)
+    except:
+        LOG.debug(f"file_changed?: unable to stat {sound.path}")
+        return True
+    return stat_result.st_mtime_ns > sound.stat_result.st_mtime_ns
+
 class SoundManager():
 
     def __init__(self):
@@ -227,18 +235,16 @@ class SoundManager():
     def get(self, path, force_reload=False ):
         if path in self._cache and not force_reload:
             if not os.path.isfile(path):
+                LOG.debug(f"SoundManager: sound in cache, but there is no file anymore, discard it ({self._cache[path]})")
                 del self._cache[path]
                 return None
             sound = self._cache[path]
-            stat_result = os.stat(path)
-            if stat_result.st_mtime_ns > sound.stat_result.st_mtime_ns:
-                LOG.debug(f"sound in cache but changed on disk, reloading (and stop it if it was playing): {sound}")
-                #TODO il va y avoir un souci ici
-                #sound.stop()
+            if file_changed(sound):
+                LOG.debug(f"SoundManager: sound in cache but changed on disk, reload it ({self._cache[path]})")
                 return self._load(path)
             return sound
         else:
-            LOG.debug(f"sound not in cache, or reload forced, load it: {path}")
+            LOG.debug(f"SoundManager: sound not in cache, or reload forced, load it ({path})")
             return self._load(path)
 
     def is_loaded(self, path):
@@ -246,8 +252,14 @@ class SoundManager():
 
     def _load(self, path):
         if not os.path.isfile(path):
+            LOG.debug(f"SoundManager: not an existing file, unable to load {path}")
             return None
-        sound = Sound(path=path, stat_result=os.stat(path))
+        try:
+            stat_result=os.stat(path)
+        except:
+            LOG.debug(f"SoundManager: unable to stat, unable to load {path}")
+            return None
+        sound = Sound(path=path, stat_result=stat_result)
         self._cache[path] = sound
         return sound
 
@@ -508,9 +520,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.seek_slider.setValue(0)
 
     def select_path(self):
-        # est-ce que je teste si il y a une sélection de taille 1 ou est-ce le code appelant? plutôt le code appelant à priori?
-        # est-ce que je vais chercher self.tableView.currentIndex() ou j'utilise un param index?
-        # lorsque c'est un dir qui est sélectionné est ce que cette fonction est appelée?
         fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
         filepath = self.tableview_get_path(self.tableView.currentIndex())
         self.locationBar.setText(filepath)
@@ -665,26 +674,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.refresh_config()
 
     def tableView_contextMenuEvent(self, event):
-        # todo:
-        #
-        # - vérifier que si c'est appelé la sélection a déjà
-        #   changé. Dans ce cas, pas besoin de récupe le path, tout
-        #   ça, il suffit d'instancier le popup et celui ci se servira
-        #   de current_sound_selected
-        #
-        # - éventuellement ajouter du code qui vérifie si un sound est
-        #   déjà dans le soundmanager et ne propose pas le reload si
-        #   il y est pas
-        #
-        # - Se poser la question si c'est nécessaire d'avoir un reload
-        #   si on change l'uri des sons à chaque fois à un seul
-        #   playbin. les arguments pour:
-        #
-        #   - si on change pas de son, permet de forcer un reload
-        #
-        #   - reset des metadata (mais ils seront updatés
-        #     automatiquement à la prochaine lecture de toutes façon,
-        #     non?)
         index = self.tableView.indexAt(event.pos())
         if index:
             path = self.tableview_get_path(index)
@@ -693,11 +682,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.tableView_contextMenu.popup(QtGui.QCursor.pos())
 
     def reload_sound(self):
-        # todo: voir tableView_contextMenuEvent
         path = self.tableView_contextMenu.path_to_reload
-        self.stop()
-        self.manager.get(path, force_reload=True)
-        self.play()
+        self.current_sound_selected = self.manager.get(path, force_reload=True)
 
     def loop_shortcut_activated(self):
         self.loop_button.click()
@@ -863,6 +849,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if self.state == SoundState.STOPPED:
             if self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
                 self.update_player_path(self.current_sound_selected)
+            elif file_changed(self.current_sound_playing):
+                self.update_player_path(self.current_sound_playing)
             self.player.set_state(Gst.State.PAUSED)
             if self.config['play_looped']:
                 self.player.seek(1.0,
