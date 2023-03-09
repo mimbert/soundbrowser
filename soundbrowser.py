@@ -50,15 +50,15 @@ _handler.setFormatter(CustomFormatter())
 _handler.setLevel(logging.DEBUG)
 LOG.addHandler(_handler)
 
-STARTUP_DIR_MODE_SPECIFIED_DIR = 1
-STARTUP_DIR_MODE_LAST_DIR = 2
-STARTUP_DIR_MODE_CURRENT_DIR = 3
-STARTUP_DIR_MODE_HOME_DIR = 4
+STARTUP_PATH_MODE_SPECIFIED_PATH = 1
+STARTUP_PATH_MODE_LAST_PATH = 2
+STARTUP_PATH_MODE_CURRENT_DIR = 3
+STARTUP_PATH_MODE_HOME_DIR = 4
 
 conf_schema = schema.Schema({
-    schema.Optional('startup_dir_mode', default=STARTUP_DIR_MODE_HOME_DIR): int,
-    schema.Optional('specified_dir', default=os.path.expanduser('~')): str,
-    schema.Optional('last_dir', default=os.path.expanduser('~')): str,
+    schema.Optional('startup_path_mode', default=STARTUP_PATH_MODE_HOME_DIR): int,
+    schema.Optional('specified_path', default=os.path.expanduser('~')): str,
+    schema.Optional('last_path', default=os.path.expanduser('~')): str,
     schema.Optional('show_hidden_files', default=False): bool,
     schema.Optional('show_metadata_pane', default=True): bool,
     schema.Optional('main_window_geometry', default=None): bytes,
@@ -314,12 +314,12 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         self.populate()
 
     def populate(self):
-        self.specified_dir_button.clicked.connect(self.specified_dir_button_clicked)
+        self.specified_path_button.clicked.connect(self.specified_path_button_clicked)
 
-    def specified_dir_button_clicked(self, checked = False):
-        path = QtWidgets.QFileDialog.getExistingDirectory(self, "startup directory", self.specified_dir.text())
+    def specified_path_button_clicked(self, checked = False):
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, "startup path", self.specified_path.text())
         if path:
-            self.specified_dir.setText(path)
+            self.specified_path.setText(path)
 
 # not to be confused with gst state which is only PLAYING or PAUSED
 SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
@@ -379,8 +379,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.config['main_window_geometry'] = self.saveGeometry().data()
         self.config['main_window_state'] = self.saveState().data()
         self.config['splitter_state'] = self.splitter.saveState().data()
-        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
-            self.config['last_dir'] = self.fs_model.filePath(self.treeView.currentIndex())
+        if self.config['startup_path_mode'] == STARTUP_PATH_MODE_LAST_PATH:
+            self.config['last_path'] = self.tableview_get_path(self.tableView.currentIndex())
         save_conf(self.conf_file, self.config)
 
     def closeEvent(self, event):
@@ -427,24 +427,18 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setColumnHidden(3, True)
         self.treeView.selectionModel().selectionChanged.connect(self.treeview_selection_changed)
         self.treeView.setRootIndex(self.fs_model.index('/'))
-        startup_dir, startup_filename = None, None
-        if startup_path:
-            startup_dir, startup_filename = split_path_filename(startup_path)
-        if startup_dir:
-            self.config['last_dir'] = startup_dir
-        else:
-            if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
-                startup_dir, startup_filename = split_path_filename(self.config['specified_dir'])
-                if not startup_dir:
-                    startup_dir = os.getcwd()
-            elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
-                startup_dir = self.config['last_dir']
-            elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
-                startup_dir = os.getcwd()
-            elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
-                startup_dir = os.path.expanduser('~')
-        self.treeView.setCurrentIndex(self.fs_model.index(startup_dir))
-        self.treeView.expand(self.fs_model.index(startup_dir))
+        if not startup_path:
+            if self.config['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
+                startup_path = self.config['specified_path']
+                if not startup_path:
+                    startup_path = os.getcwd()
+            elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_LAST_PATH:
+                startup_path = self.config['last_path']
+            elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_CURRENT_DIR:
+                startup_path = os.getcwd()
+            elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_HOME_DIR:
+                startup_path = os.path.expanduser('~')
+        self.goto_path(startup_path)
         self.treeView.header().setSortIndicator(0,QtCore.Qt.AscendingOrder)
         self.treeView.setSortingEnabled(True)
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
@@ -518,6 +512,17 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.stop_button.setEnabled(False)
             self.seek_slider.setEnabled(False)
             self.seek_slider.setValue(0)
+
+    def goto_path(self, path):
+        directory, filename = split_path_filename(path)
+        if directory:
+            self.treeView.setCurrentIndex(self.fs_model.index(directory))
+            self.treeView.expand(self.fs_model.index(directory))
+            self.config['last_path'] = directory
+            if filename:
+                self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(directory)))
+                self.tableView.selectRow(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)).row())
+                self.config['last_path'] = path
 
     def select_path(self):
         fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
@@ -608,7 +613,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.expand(self.fs_model.index(path))
 
     def tableview_get_path(self, index):
-        return self.dir_model.filePath(self.dir_proxy_model.mapToSource(index))
+        return os.path.abspath(self.dir_model.filePath(self.dir_proxy_model.mapToSource(index)))
 
     def tableview_selection_changed(self, selected, deselected):
         LOG.debug(f"tableview_selection_changed  len(selected)={len(selected)}")
@@ -633,16 +638,10 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView_return_pressed()
 
     def locationBar_return_pressed(self):
-        directory, filename = split_path_filename(self.locationBar.text())
-        if directory:
-            self.treeView.setCurrentIndex(self.fs_model.index(directory))
-            self.treeView.expand(self.fs_model.index(directory))
+        self.goto_path(self.locationBar.text())
 
     def mainwin_paste(self):
-        directory, filename = split_path_filename(self.clipboard.text())
-        if directory:
-            self.treeView.setCurrentIndex(self.fs_model.index(directory))
-            self.treeView.expand(self.fs_model.index(directory))
+        self.goto_path(self.clipboard.text())
 
     def copy_path_clicked(self, checked = False):
         self.locationBar.setSelection(0, len(self.locationBar.text()))
@@ -651,25 +650,25 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def prefs_button_clicked(self, checked = False):
         prefs = PrefsDialog(self)
         prefs.file_extensions_filter.setText(' '.join(self.config['file_extensions_filter']))
-        prefs.specified_dir.setText(self.config['specified_dir'])
-        if self.config['startup_dir_mode'] == STARTUP_DIR_MODE_SPECIFIED_DIR:
-            prefs.startup_dir_mode_specified_dir.setChecked(True)
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_LAST_DIR:
-            prefs.startup_dir_mode_last_dir.setChecked(True)
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_CURRENT_DIR:
-            prefs.startup_dir_mode_current_dir.setChecked(True)
-        elif self.config['startup_dir_mode'] == STARTUP_DIR_MODE_HOME_DIR:
-            prefs.startup_dir_mode_home_dir.setChecked(True)
+        prefs.specified_path.setText(self.config['specified_path'])
+        if self.config['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
+            prefs.startup_path_mode_specified_path.setChecked(True)
+        elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_LAST_PATH:
+            prefs.startup_path_mode_last_path.setChecked(True)
+        elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_CURRENT_DIR:
+            prefs.startup_path_mode_current_dir.setChecked(True)
+        elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_HOME_DIR:
+            prefs.startup_path_mode_home_dir.setChecked(True)
         if prefs.exec_():
-            if prefs.startup_dir_mode_specified_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_SPECIFIED_DIR
-            elif prefs.startup_dir_mode_last_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_LAST_DIR
-            elif prefs.startup_dir_mode_current_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_CURRENT_DIR
-            elif prefs.startup_dir_mode_home_dir.isChecked():
-                self.config['startup_dir_mode'] = STARTUP_DIR_MODE_HOME_DIR
-            self.config['specified_dir'] = prefs.specified_dir.text()
+            if prefs.startup_path_mode_specified_path.isChecked():
+                self.config['startup_path_mode'] = STARTUP_PATH_MODE_SPECIFIED_PATH
+            elif prefs.startup_path_mode_last_path.isChecked():
+                self.config['startup_path_mode'] = STARTUP_PATH_MODE_LAST_PATH
+            elif prefs.startup_path_mode_current_dir.isChecked():
+                self.config['startup_path_mode'] = STARTUP_PATH_MODE_CURRENT_DIR
+            elif prefs.startup_path_mode_home_dir.isChecked():
+                self.config['startup_path_mode'] = STARTUP_PATH_MODE_HOME_DIR
+            self.config['specified_path'] = prefs.specified_path.text()
             self.config['file_extensions_filter'] = prefs.file_extensions_filter.text().split(' ')
             self.refresh_config()
 
