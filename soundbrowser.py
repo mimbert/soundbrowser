@@ -748,6 +748,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def notify_sound_stopped(self):
         self.state = SoundState.STOPPED
         self.disable_seek_pos_updates()
+        self.seek_slider.setValue(100.0)
         LOG.debug(f"sound reached end")
 
     def gst_bus_message_handler(self, bus, message, *user_data):
@@ -820,16 +821,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def disable_seek_pos_updates(self):
         LOG.debug(f"disable seek pos updates")
         self.seek_pos_update_timer.stop()
-        # following block added because sometimes, when the sound
-        # reaches its end, it looks like even though
-        # disable_seek_pos_updates is called before the seek to the
-        # beginning, there may still be a seek_position_updater call
-        # occuring after, which causes the slider to reset to zero
-        # anyway
-        try:
-            self.seek_pos_update_timer.timeout.disconnect(self.seek_position_updater)
-        except:
-            pass
 
     def update_player_path(self, sound):
         LOG.debug(f"update_player_path to {sound.path}")
