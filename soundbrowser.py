@@ -209,7 +209,7 @@ class Sound(QtCore.QObject):
         self.stat_result = stat_result
 
     def __str__(self):
-        return f"Sound<path={self.path}>"
+        return f"Sound@0x{id(self):x}<path={self.path}>"
 
     def update_metadata(self, metadata):
         for k in metadata:
