@@ -350,7 +350,6 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
         self.seek_next_value = None
-        self.gst_async_done_callbacks = []
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
 
     def __str__(self):
@@ -635,6 +634,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.treeView.setCurrentIndex(self.fs_model.index(path))
                 self.treeView.expand(self.fs_model.index(path))
             elif fileinfo.isFile():
+                self.stop()
                 self.play()
 
     def tableview_clicked(self, index):
@@ -761,15 +761,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         LOG.debug(f"sound reached end")
 
     def gst_bus_message_handler(self, bus, message, *user_data):
-        if message.type == Gst.MessageType.ASYNC_DONE:
-            for callback in self.gst_async_done_callbacks:
-                func = callback[0]
-                args = callback[1]
-                kwargs = callback[2]
-                LOG.debug(f"ASYNC_DONE, calling {func.__name__} with args {args} kwargs {kwargs}")
-                func(*args, **kwargs)
-            self.gst_async_done_callbacks.clear()
-        elif message.type == Gst.MessageType.SEGMENT_DONE:
+        if message.type == Gst.MessageType.SEGMENT_DONE:
             log_gst_message(message)
             if self.config['play_looped']:
                 # normal looping when no seeking has been done
@@ -882,24 +874,18 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.state = SoundState.PAUSED
         self.disable_seek_pos_updates()
 
-    def player_seek_with_callback(self, rate, formt, flags, start_type, start, stop_type, stop, callback_tuple):
-        self.gst_async_done_callbacks.append(callback_tuple)
-        self.player.seek(rate, formt, flags, start_type, start, stop_type, stop)
-
     def stop(self):
         LOG.debug(f"stop {self}")
         self.player.set_state(Gst.State.PAUSED)
-        self.player_seek_with_callback(1.0,
-                                       Gst.Format.TIME,
-                                       Gst.SeekFlags.FLUSH,
-                                       Gst.SeekType.SET, 0,
-                                       Gst.SeekType.NONE, 0,
-                                       (self.disable_seek_pos_updates, [], {}))
+        self.player.seek(1.0,
+                         Gst.Format.TIME,
+                         Gst.SeekFlags.FLUSH,
+                         Gst.SeekType.SET, 0,
+                         Gst.SeekType.NONE, 0)
         self.state = SoundState.STOPPED
+        self.disable_seek_pos_updates()
         self._current_sound_playing = None
-        signals_blocked = self.seek_slider.blockSignals(True)
         self.seek_slider.setValue(0.0)
-        self.seek_slider.blockSignals(signals_blocked)
 
     def seek(self, position):
         LOG.debug(f"seek to {position} {self}")
