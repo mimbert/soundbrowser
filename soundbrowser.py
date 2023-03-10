@@ -457,6 +457,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.show_metadata_pane_button.clicked.connect(self.show_metadata_pane_clicked)
         self.filter_files_button.clicked.connect(self.filter_files_clicked)
         self.copy_path_button.clicked.connect(self.copy_path_clicked)
+        self.paste_path_button.clicked.connect(self.paste_path_clicked)
         self.play_button.clicked.connect(self.play_clicked)
         self.stop_button.clicked.connect(self.stop_clicked)
         self.pause_icon = QtGui.QIcon(":/icons/pause.png")
@@ -492,6 +493,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         filter_shortcut.activated.connect(self.filter_shortcut_activated)
         play_shortcut.activated.connect(self.play_shortcut_activated)
         stop_shortcut.activated.connect(self.stop_shortcut_activated)
+        self.copy_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Copy), self)
+        self.copy_shortcut.activated.connect(self.mainwin_copy)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
         self.clear_metadata_pane()
@@ -640,12 +643,19 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def locationBar_return_pressed(self):
         self.goto_path(self.locationBar.text())
 
+    def mainwin_copy(self):
+        self.locationBar.setSelection(0, len(self.locationBar.text()))
+        self.clipboard.setText(self.locationBar.text())
+
     def mainwin_paste(self):
         self.goto_path(self.clipboard.text())
 
     def copy_path_clicked(self, checked = False):
         self.locationBar.setSelection(0, len(self.locationBar.text()))
         self.clipboard.setText(self.locationBar.text())
+
+    def paste_path_clicked(self, checked = False):
+        self.goto_path(self.clipboard.text())
 
     def prefs_button_clicked(self, checked = False):
         prefs = PrefsDialog(self)
