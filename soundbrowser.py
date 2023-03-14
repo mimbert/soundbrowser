@@ -107,8 +107,6 @@ def get_available_gst_factory_supported_properties(factory_name):
     for p in element.list_properties():
         if not(p.flags & GObject.ParamFlags.WRITABLE):
             continue
-        # if not(p.value_type.name in [ 'gchararray', 'gboolean', 'gint64', 'guint', 'gint64', 'gint', 'gdouble']):
-        #     continue
         properties[p.name] = p
     return properties
 
@@ -688,14 +686,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def tableview_selection_changed(self, selected, deselected):
-        log.debug(f"tableview_selection_changed  len(selected)={len(selected)}")
         if len(selected) == 1:
             self.select_path()
 
     @QtCore.Slot()
     def tableView_return_pressed(self):
-        self.tableView.selectionModel().selectedRows()
-        log.debug(f"tableview_return_pressed  len(self.tableView.selectionModel().selectedRows())={len(self.tableView.selectionModel().selectedRows())}")
         if len(self.tableView.selectionModel().selectedRows()) == 1:
             self.select_path()
             fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
