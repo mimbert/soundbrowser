@@ -715,7 +715,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if len(selected) == 1:
             self.select_path()
         if self.in_keyboard_press_event and self.config['autoplay_keyboard']:
-            self.tableView_return_pressed()
+            self.tableView_return_pressed(change_dir=False)
 
     def tableview_keyPressEvent(self, event):
         self.in_keyboard_press_event = True
@@ -723,11 +723,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.in_keyboard_press_event = False
 
     @QtCore.Slot()
-    def tableView_return_pressed(self):
+    def tableView_return_pressed(self, change_dir=True):
         if len(self.tableView.selectionModel().selectedRows()) == 1:
             self.select_path()
             fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
-            if fileinfo.isDir():
+            if fileinfo.isDir() and change_dir:
                 path = self.tableview_get_path(self.tableView.currentIndex())
                 self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
                 self.treeView.setCurrentIndex(self.fs_model.index(path))
