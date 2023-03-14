@@ -190,7 +190,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -209,7 +209,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -238,7 +238,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -257,7 +257,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -336,7 +336,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -365,7 +365,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -381,7 +381,7 @@
                    <item row="8" column="1" colspan="3">
                     <widget class="QLabel" name="comment">
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -400,7 +400,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -419,7 +419,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -481,7 +481,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -500,7 +500,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -548,7 +548,7 @@
                       <enum>QFrame::NoFrame</enum>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -577,7 +577,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -596,7 +596,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
@@ -615,7 +615,7 @@
                       <bool>false</bool>
                      </property>
                      <property name="text">
-                      <string/>
+                      <string>x</string>
                      </property>
                      <property name="textFormat">
                       <enum>Qt::PlainText</enum>
