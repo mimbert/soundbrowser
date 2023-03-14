@@ -349,6 +349,7 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
     def populate(self):
         self.specified_path_button.clicked.connect(self.specified_path_button_clicked)
 
+    @QtCore.Slot()
     def specified_path_button_clicked(self, checked = False):
         path = QtWidgets.QFileDialog.getExistingDirectory(self, "startup path", self.specified_path.text())
         if path:
@@ -667,9 +668,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def update_metadata_pane_to_current_playing(self):
         self.update_metadata_pane(self.current_sound_playing.metadata)
 
+    @QtCore.Slot()
     def dir_model_directory_loaded(self, path):
         self.tableView.resizeColumnToContents(0)
 
+    @QtCore.Slot()
     def treeview_selection_changed(self, selected, deselected):
         path = self.fs_model.filePath(self.treeView.currentIndex())
         self.locationBar.setText(path)
@@ -680,11 +683,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def tableview_get_path(self, index):
         return os.path.abspath(self.dir_model.filePath(self.dir_proxy_model.mapToSource(index)))
 
+    @QtCore.Slot()
     def tableview_selection_changed(self, selected, deselected):
         LOG.debug(f"tableview_selection_changed  len(selected)={len(selected)}")
         if len(selected) == 1:
             self.select_path()
 
+    @QtCore.Slot()
     def tableView_return_pressed(self):
         self.tableView.selectionModel().selectedRows()
         LOG.debug(f"tableview_return_pressed  len(self.tableView.selectionModel().selectedRows())={len(self.tableView.selectionModel().selectedRows())}")
@@ -700,23 +705,29 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.stop()
                 self.play()
 
+    @QtCore.Slot()
     def tableview_clicked(self, index):
         self.tableView_return_pressed()
 
+    @QtCore.Slot()
     def locationBar_return_pressed(self):
         self.goto_path(self.locationBar.text())
 
+    @QtCore.Slot()
     def mainwin_copy(self):
         self.locationBar.setSelection(0, len(self.locationBar.text()))
         self.clipboard.setText(self.locationBar.text())
 
+    @QtCore.Slot()
     def mainwin_paste(self):
         self.goto_path(self.clipboard.text())
 
+    @QtCore.Slot()
     def copy_path_clicked(self, checked = False):
         self.locationBar.setSelection(0, len(self.locationBar.text()))
         self.clipboard.setText(self.locationBar.text())
 
+    @QtCore.Slot()
     def paste_path_clicked(self, checked = False):
         self.goto_path(self.clipboard.text())
 
@@ -844,50 +855,63 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.tableView_contextMenu.path_to_reload = path
                 self.tableView_contextMenu.popup(QtGui.QCursor.pos())
 
+    @QtCore.Slot()
     def reload_sound(self):
         path = self.tableView_contextMenu.path_to_reload
         self.current_sound_selected = self.manager.get(path, force_reload=True)
 
+    @QtCore.Slot()
     def loop_shortcut_activated(self):
         self.loop_button.click()
 
+    @QtCore.Slot()
     def metadata_shortcut_activated(self):
         self.show_metadata_pane_button.click()
 
+    @QtCore.Slot()
     def hidden_shortcut_activated(self):
         self.show_hidden_files_button.click()
 
+    @QtCore.Slot()
     def filter_shortcut_activated(self):
         self.filter_files_button.click()
 
+    @QtCore.Slot()
     def play_shortcut_activated(self):
         self.play_button.click()
 
+    @QtCore.Slot()
     def stop_shortcut_activated(self):
         self.stop_button.click()
 
+    @QtCore.Slot()
     def loop_clicked(self, checked = False):
         self.config['play_looped'] = checked
 
+    @QtCore.Slot()
     def show_metadata_pane_clicked(self, checked = False):
         self.config['show_metadata_pane'] = checked
         self.refresh_config()
 
+    @QtCore.Slot()
     def show_hidden_files_clicked(self, checked = False):
         self.config['show_hidden_files'] = checked
         self.refresh_config()
 
+    @QtCore.Slot()
     def filter_files_clicked(self, checked = False):
         self.config['filter_files'] = checked
         self.refresh_config()
         self.dir_proxy_model.invalidateFilter()
 
+    @QtCore.Slot()
     def play_clicked(self, checked):
         if self.state in [ SoundState.STOPPED, SoundState.PAUSED ] :
             self.play()
         else:
             self.pause()
 
+    @QtCore.Slot()
     def stop_clicked(self, checked):
         self.stop()
 
