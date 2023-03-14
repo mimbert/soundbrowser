@@ -560,6 +560,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         prefs_audio_sink_properties_del_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete), self.preference_dialog.audio_output_properties)
         prefs_audio_sink_properties_del_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
         prefs_audio_sink_properties_del_shortcut.activated.connect(self.prefs_audio_sink_prop_del)
+        prefs_audio_sink_properties_backspace_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Backspace), self.preference_dialog.audio_output_properties)
+        prefs_audio_sink_properties_backspace_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        prefs_audio_sink_properties_backspace_shortcut.activated.connect(self.prefs_audio_sink_prop_del)
         self.clear_metadata_pane()
         self.tableView.setFocus()
 
