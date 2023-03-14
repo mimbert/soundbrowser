@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>640</width>
-    <height>550</height>
+    <height>482</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,7 +30,7 @@
    <property name="geometry">
     <rect>
      <x>70</x>
-     <y>510</y>
+     <y>450</y>
      <width>501</width>
      <height>27</height>
     </rect>
@@ -49,7 +49,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>20</y>
+     <y>70</y>
      <width>141</width>
      <height>25</height>
     </rect>
@@ -68,7 +68,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>40</y>
+     <y>90</y>
      <width>129</width>
      <height>25</height>
     </rect>
@@ -87,7 +87,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>60</y>
+     <y>110</y>
      <width>151</width>
      <height>25</height>
     </rect>
@@ -106,7 +106,7 @@
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>60</y>
+     <y>110</y>
      <width>411</width>
      <height>27</height>
     </rect>
@@ -116,7 +116,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>80</y>
+     <y>130</y>
      <width>131</width>
      <height>25</height>
     </rect>
@@ -129,7 +129,7 @@
    <property name="geometry">
     <rect>
      <x>600</x>
-     <y>60</y>
+     <y>110</y>
      <width>21</width>
      <height>26</height>
     </rect>
@@ -142,7 +142,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>0</y>
+     <y>50</y>
      <width>151</width>
      <height>19</height>
     </rect>
@@ -161,7 +161,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>110</y>
+     <y>170</y>
      <width>141</width>
      <height>19</height>
     </rect>
@@ -180,7 +180,7 @@
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>110</y>
+     <y>170</y>
      <width>431</width>
      <height>27</height>
     </rect>
@@ -190,7 +190,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>160</y>
+     <y>220</y>
      <width>171</width>
      <height>19</height>
     </rect>
@@ -203,7 +203,7 @@
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>160</y>
+     <y>220</y>
      <width>431</width>
      <height>27</height>
     </rect>
@@ -213,7 +213,7 @@
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>300</y>
+     <y>360</y>
      <width>431</width>
      <height>81</height>
     </rect>
@@ -257,7 +257,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>300</y>
+     <y>360</y>
      <width>161</width>
      <height>41</height>
     </rect>
@@ -271,7 +271,7 @@ properties</string>
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>180</y>
+     <y>240</y>
      <width>171</width>
      <height>51</height>
     </rect>
@@ -285,7 +285,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>190</y>
+     <y>250</y>
      <width>81</width>
      <height>19</height>
     </rect>
@@ -298,7 +298,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>210</y>
+     <y>270</y>
      <width>91</width>
      <height>19</height>
     </rect>
@@ -311,7 +311,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>230</y>
+     <y>290</y>
      <width>91</width>
      <height>19</height>
     </rect>
@@ -324,7 +324,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>250</y>
+     <y>310</y>
      <width>131</width>
      <height>19</height>
     </rect>
@@ -337,7 +337,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>190</x>
-     <y>270</y>
+     <y>330</y>
      <width>131</width>
      <height>19</height>
     </rect>
@@ -350,7 +350,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>320</x>
-     <y>190</y>
+     <y>250</y>
      <width>301</width>
      <height>19</height>
     </rect>
@@ -363,7 +363,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>320</x>
-     <y>210</y>
+     <y>270</y>
      <width>301</width>
      <height>19</height>
     </rect>
@@ -376,7 +376,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>320</x>
-     <y>230</y>
+     <y>290</y>
      <width>301</width>
      <height>19</height>
     </rect>
@@ -389,7 +389,7 @@ details</string>
    <property name="geometry">
     <rect>
      <x>320</x>
-     <y>250</y>
+     <y>310</y>
      <width>301</width>
      <height>19</height>
     </rect>
@@ -402,13 +402,78 @@ details</string>
    <property name="geometry">
     <rect>
      <x>320</x>
-     <y>270</y>
+     <y>330</y>
      <width>301</width>
      <height>19</height>
     </rect>
    </property>
    <property name="text">
     <string>x</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="check_autoplay_mouse">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>0</y>
+     <width>181</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Autoplay Mouse</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="check_autoplay_keyboard">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>20</y>
+     <width>201</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Autoplay Keyboard</string>
+   </property>
+  </widget>
+  <widget class="Line" name="line">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>40</y>
+     <width>621</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="Line" name="line_2">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>200</y>
+     <width>621</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="Line" name="line_3">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>150</y>
+     <width>621</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
    </property>
   </widget>
  </widget>

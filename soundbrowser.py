@@ -61,6 +61,8 @@ conf_schema = schema.Schema({
     schema.Optional('last_path', default=os.path.expanduser('~')): str,
     schema.Optional('show_hidden_files', default=False): bool,
     schema.Optional('show_metadata_pane', default=True): bool,
+    schema.Optional('autoplay_mouse', default=True): bool,
+    schema.Optional('autoplay_keyboard', default=False): bool,
     schema.Optional('main_window_geometry', default=None): bytes,
     schema.Optional('main_window_state', default=None): bytes,
     schema.Optional('splitter_state', default=None): bytes,
@@ -372,6 +374,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.current_sound_selected = None
         self.current_sound_playing = None
         self.setupUi(self)
+        self.in_keyboard_press_event = False
         self.populate(startup_path)
         self.player = Gst.ElementFactory.make('playbin')
         self.player.set_property('flags', self.player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)) # disable video, subtitles, visualisation
@@ -470,6 +473,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableView.selectionModel().selectionChanged.connect(self.tableview_selection_changed)
         self.tableView.clicked.connect(self.tableview_clicked)
+        self.orig_tableView_keyPressEvent = self.tableView.keyPressEvent
+        self.tableView.keyPressEvent = self.tableview_keyPressEvent
+        self.tableView.doubleClicked.connect(self.tableview_doubleClicked)
         self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index('/')))
         self.tableView.verticalHeader().hide()
         self.tableView.horizontalHeader().setSortIndicator(0, QtCore.Qt.AscendingOrder)
@@ -688,6 +694,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def tableview_selection_changed(self, selected, deselected):
         if len(selected) == 1:
             self.select_path()
+        if self.in_keyboard_press_event and self.config['autoplay_keyboard']:
+            self.tableView_return_pressed()
+
+    def tableview_keyPressEvent(self, event):
+        self.in_keyboard_press_event = True
+        self.orig_tableView_keyPressEvent(event)
+        self.in_keyboard_press_event = False
 
     @QtCore.Slot()
     def tableView_return_pressed(self):
@@ -705,7 +718,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def tableview_clicked(self, index):
-        self.tableView_return_pressed()
+        if self.config['autoplay_mouse']:
+            self.tableView_return_pressed()
+
+    @QtCore.Slot()
+    def tableview_doubleClicked(self, index):
+        if not self.config['autoplay_mouse']:
+            self.tableView_return_pressed()
 
     @QtCore.Slot()
     def locationBar_return_pressed(self):
@@ -785,6 +804,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def prefs_button_clicked(self, checked = False):
         self.tmpconfig = copy.deepcopy(self.config)
+        self.preference_dialog.check_autoplay_mouse.setChecked(self.tmpconfig['autoplay_mouse'])
+        self.preference_dialog.check_autoplay_keyboard.setChecked(self.tmpconfig['autoplay_keyboard'])
         self.preference_dialog.file_extensions_filter.setText(' '.join(self.tmpconfig['file_extensions_filter']))
         self.preference_dialog.specified_path.setText(self.tmpconfig['specified_path'])
         if self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
@@ -803,6 +824,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.preference_dialog.audio_output.setCurrentIndex(self.preference_dialog.audio_output.findText(self.tmpconfig['gst_audio_sink']))
         self.prefs_fill_audio_sink_properties()
         if self.preference_dialog.exec_():
+            self.tmpconfig['autoplay_mouse'] = self.preference_dialog.check_autoplay_mouse.isChecked()
+            self.tmpconfig['autoplay_keyboard'] = self.preference_dialog.check_autoplay_keyboard.isChecked()
             if self.preference_dialog.startup_path_mode_specified_path.isChecked():
                 self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_SPECIFIED_PATH
             elif self.preference_dialog.startup_path_mode_last_path.isChecked():
