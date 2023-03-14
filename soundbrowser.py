@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse, traceback, enum
+import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse, traceback, enum, re, copy
 
 from PySide2 import QtCore
 from PySide2 import QtGui
@@ -68,7 +68,7 @@ conf_schema = schema.Schema({
     schema.Optional('file_extensions_filter', default=['wav', 'mp3', 'aiff', 'flac', 'ogg', 'm4a', 'aac']): [str],
     schema.Optional('filter_files', default=True): bool,
     schema.Optional('gst_audio_sink', default=''): str,
-    schema.Optional('gst_audio_sink_properties', default={}): {schema.Optional(str): str},
+    schema.Optional('gst_audio_sink_properties', default={}): {schema.Optional(str): {schema.Optional(str): str}},
 })
 
 def load_conf(path):
@@ -89,6 +89,40 @@ def save_conf(path, conf):
             yaml.dump(conf, fh)
     except OSError:
         LOG.debug(f"unable to save conf to {path}")
+
+_blacklisted_gst_audio_sink_factory_regexes = [
+    '^interaudiosink$',
+    '^ladspasink.*',
+]
+def get_available_gst_audio_sink_factories():
+    factories = Gst.Registry.get().get_feature_list(Gst.ElementFactory)
+    audio_sinks_factories = [ f for f in factories if ('Audio' in f.get_klass() and ('sink' in f.name or 'Sink' in f.get_klass())) ]
+    for regex in _blacklisted_gst_audio_sink_factory_regexes:
+        audio_sinks_factories = [ f for f in audio_sinks_factories if not re.search(regex, f.name) ]
+    return { f.name: f for f in audio_sinks_factories }
+
+def get_available_gst_factory_supported_properties(factory_name):
+    element = Gst.ElementFactory.make(factory_name, None)
+    properties = {}
+    for p in element.list_properties():
+        if not(p.flags & GObject.ParamFlags.WRITABLE):
+            continue
+        # if not(p.value_type.name in [ 'gchararray', 'gboolean', 'gint64', 'guint', 'gint64', 'gint', 'gdouble']):
+        #     continue
+        properties[p.name] = p
+    return properties
+
+def cast_str_to_prop_pytype(prop, s):
+    if prop.value_type.name == 'gchararray':
+        return s
+    elif prop.value_type.name == 'gboolean':
+        return s.lower() in [ 'true', '1' ]
+    elif prop.value_type.name in [ 'gint64', 'guint', 'gint64', 'gint' ]:
+        return int(s)
+    elif prop.value_type.name == 'gdouble':
+        return float(s)
+    else:
+        return s
 
 class LRU(collections.OrderedDict):
     'Limit size, evicting the least recently looked-up key when full'
@@ -230,7 +264,6 @@ class SoundManager():
 
     def __init__(self):
         self._cache = LRU(maxsize = CACHE_SIZE) # keys: file pathes. Values: Sound
-        Gst.init(None)
 
     def get(self, path, force_reload=False ):
         if path in self._cache and not force_reload:
@@ -327,6 +360,7 @@ SoundState = enum.Enum('SoundState', ['STOPPED', 'PLAYING', 'PAUSED'])
 class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     update_metadata_to_current_playing_message = QtCore.Signal()
+    update_prefs_audio_sink_properties = QtCore.Signal()
 
     def __init__(self, startup_path, clipboard, conf_file):
         super().__init__()
@@ -334,6 +368,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.clipboard = clipboard
         self.conf_file = conf_file
         self.config = load_conf(self.conf_file)
+        self.available_gst_audio_sink_factories = get_available_gst_audio_sink_factories()
         self.manager = SoundManager()
         self.current_sound_selected = None
         self.current_sound_playing = None
@@ -341,11 +376,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.populate(startup_path)
         self.player = Gst.ElementFactory.make('playbin')
         self.player.set_property('flags', self.player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)) # disable video, subtitles, visualisation
-        if self.config['gst_audio_sink']:
-            audiosink = Gst.ElementFactory.make(self.config['gst_audio_sink'])
-            for k, v in self.config['gst_audio_sink_properties'].items():
-                audiosink.set_property(k, v)
-            self.player.set_property("audio-sink", audiosink)
+        self.configure_audio_output()
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, self.gst_bus_message_handler, None)
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
@@ -400,6 +431,31 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.bottom_pane.show()
         else:
             self.bottom_pane.hide()
+
+    def configure_audio_output(self):
+        LOG.debug(f"check gst sink {self.config['gst_audio_sink']} available")
+        if self.config['gst_audio_sink'] not in self.available_gst_audio_sink_factories:
+            LOG.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}', using default")
+            self.config['gst_audio_sink'] = ''
+        if self.config['gst_audio_sink']:
+            if self.config['gst_audio_sink'] not in self.config['gst_audio_sink_properties']:
+                self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']] = {}
+            available_properties = get_available_gst_factory_supported_properties(self.config['gst_audio_sink'])
+            for config_prop in list(self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']].keys()):
+                LOG.debug(f"check gst sink property {config_prop} available for {self.config['gst_audio_sink']}")
+                if config_prop not in available_properties:
+                    LOG.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}' property '{config_prop}', removing it from config")
+                    del self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']][config_prop]
+            audiosink = Gst.ElementFactory.make(self.config['gst_audio_sink'])
+            for k, v in self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']].items():
+                try:
+                    audiosink.set_property(k, cast_str_to_prop_pytype(available_properties[k], v))
+                except:
+                    LOG.error(f"gst sink {self.config['gst_audio_sink']}: unable to set property {k} to value {cast_str_to_prop_pytype(available_properties[k], v)}")
+            try:
+                self.player.set_property("audio-sink", audiosink)
+            except:
+                LOG.error(f"gst playbin: unable to set audiosink to {self.config['gst_audio_sink']}")
 
     def populate(self, startup_path):
         self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
@@ -496,6 +552,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.copy_shortcut.activated.connect(self.mainwin_copy)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
+        self.preference_dialog = PrefsDialog(self)
+        self.preference_dialog.setMinimumSize(self.preference_dialog.size())
+        self.preference_dialog.setMaximumSize(self.preference_dialog.size())
+        self.update_prefs_audio_sink_properties.connect(self.prefs_fill_audio_sink_properties, QtCore.Qt.QueuedConnection)
+        prefs_audio_sink_properties_del_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete), self.preference_dialog.audio_output_properties)
+        prefs_audio_sink_properties_del_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        prefs_audio_sink_properties_del_shortcut.activated.connect(self.prefs_audio_sink_prop_del)
         self.clear_metadata_pane()
         self.tableView.setFocus()
 
@@ -657,30 +720,121 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def paste_path_clicked(self, checked = False):
         self.goto_path(self.clipboard.text())
 
+    @QtCore.Slot()
+    def prefs_audio_sink_prop_del(self):
+        item = self.preference_dialog.audio_output_properties.currentItem()
+        if item:
+            row = item.row()
+            if row >= 0 and row < self.preference_dialog.audio_output_properties.rowCount() - 1:
+                propkey = self.preference_dialog.audio_output_properties.item(row, 0).text()
+                del self.tmpconfig['gst_audio_sink_properties'][self.preference_dialog.audio_output.currentText()][propkey]
+                self.preference_dialog.audio_output_properties.removeRow(row)
+                self.update_prefs_audio_sink_properties.emit()
+
+    @QtCore.Slot()
+    def prefs_audio_sink_prop_value_changed(self, item):
+        if self.preference_dialog.audio_output.currentText() not in self.tmpconfig['gst_audio_sink_properties']:
+            self.tmpconfig['gst_audio_sink_properties'] \
+                [self.preference_dialog.audio_output.currentText()] = {}
+        if item.row() == self.preference_dialog.audio_output_properties.rowCount() - 1:
+            propkey = self.preference_dialog.audio_output_properties.cellWidget(item.row(), 0).currentText()
+        else:
+            propkey = self.preference_dialog.audio_output_properties.item(item.row(), 0).text()
+        self.tmpconfig['gst_audio_sink_properties'] \
+            [self.preference_dialog.audio_output.currentText()][propkey] \
+            = self.preference_dialog.audio_output_properties.item(item.row(), 1).text()
+        self.update_prefs_audio_sink_properties.emit()
+
+    @QtCore.Slot()
+    def prefs_fill_audio_sink_properties(self):
+        audiosink = self.preference_dialog.audio_output.currentText()
+        available_properties = get_available_gst_factory_supported_properties(audiosink)
+        self.preference_dialog.audio_output_properties.blockSignals(True)
+        self.preference_dialog.audio_output_properties.clear()
+        self.preference_dialog.audio_output_properties.setHorizontalHeaderLabels([ 'property', 'value' ])
+        self.preference_dialog.audio_output_properties.setRowCount(0)
+        if audiosink in self.tmpconfig['gst_audio_sink_properties']:
+            self.preference_dialog.audio_output_properties.setRowCount(len(self.tmpconfig['gst_audio_sink_properties'][audiosink]))
+            for i, config_prop in enumerate(self.tmpconfig['gst_audio_sink_properties'][audiosink]):
+                del available_properties[config_prop]
+                kitem = QtWidgets.QTableWidgetItem(config_prop)
+                kitem.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
+                vitem = QtWidgets.QTableWidgetItem(self.tmpconfig['gst_audio_sink_properties'][audiosink][config_prop])
+                vitem.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+                self.preference_dialog.audio_output_properties.setItem(i, 0, kitem)
+                self.preference_dialog.audio_output_properties.setItem(i, 1, vitem)
+        prop_selection_combo = QtWidgets.QComboBox(self.preference_dialog.audio_output_properties)
+        prop_selection_combo.addItems(sorted(available_properties.keys()))
+        self.preference_dialog.audio_output_properties.setRowCount(self.preference_dialog.audio_output_properties.rowCount() + 1)
+        self.preference_dialog.audio_output_properties.setCellWidget(self.preference_dialog.audio_output_properties.rowCount() - 1, 0, prop_selection_combo)
+        prop_value_item = QtWidgets.QTableWidgetItem('')
+        prop_value_item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable)
+        self.preference_dialog.audio_output_properties.setItem(self.preference_dialog.audio_output_properties.rowCount() - 1, 1, prop_value_item)
+        self.preference_dialog.audio_output_properties.blockSignals(False)
+        self.preference_dialog.audio_output_properties.itemChanged.connect(self.prefs_audio_sink_prop_value_changed)
+
+    @QtCore.Slot()
     def prefs_button_clicked(self, checked = False):
-        prefs = PrefsDialog(self)
-        prefs.file_extensions_filter.setText(' '.join(self.config['file_extensions_filter']))
-        prefs.specified_path.setText(self.config['specified_path'])
-        if self.config['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
-            prefs.startup_path_mode_specified_path.setChecked(True)
-        elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_LAST_PATH:
-            prefs.startup_path_mode_last_path.setChecked(True)
-        elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_CURRENT_DIR:
-            prefs.startup_path_mode_current_dir.setChecked(True)
-        elif self.config['startup_path_mode'] == STARTUP_PATH_MODE_HOME_DIR:
-            prefs.startup_path_mode_home_dir.setChecked(True)
-        if prefs.exec_():
-            if prefs.startup_path_mode_specified_path.isChecked():
-                self.config['startup_path_mode'] = STARTUP_PATH_MODE_SPECIFIED_PATH
-            elif prefs.startup_path_mode_last_path.isChecked():
-                self.config['startup_path_mode'] = STARTUP_PATH_MODE_LAST_PATH
-            elif prefs.startup_path_mode_current_dir.isChecked():
-                self.config['startup_path_mode'] = STARTUP_PATH_MODE_CURRENT_DIR
-            elif prefs.startup_path_mode_home_dir.isChecked():
-                self.config['startup_path_mode'] = STARTUP_PATH_MODE_HOME_DIR
-            self.config['specified_path'] = prefs.specified_path.text()
-            self.config['file_extensions_filter'] = prefs.file_extensions_filter.text().split(' ')
+        self.tmpconfig = copy.deepcopy(self.config)
+        self.preference_dialog.file_extensions_filter.setText(' '.join(self.tmpconfig['file_extensions_filter']))
+        self.preference_dialog.specified_path.setText(self.tmpconfig['specified_path'])
+        if self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
+            self.preference_dialog.startup_path_mode_specified_path.setChecked(True)
+        elif self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_LAST_PATH:
+            self.preference_dialog.startup_path_mode_last_path.setChecked(True)
+        elif self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_CURRENT_DIR:
+            self.preference_dialog.startup_path_mode_current_dir.setChecked(True)
+        elif self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_HOME_DIR:
+            self.preference_dialog.startup_path_mode_home_dir.setChecked(True)
+        self.preference_dialog.audio_output.blockSignals(True)
+        self.preference_dialog.audio_output.clear()
+        self.preference_dialog.audio_output.addItems( ['(default)'] + [ fname for fname in self.available_gst_audio_sink_factories ])
+        self.preference_dialog.audio_output.blockSignals(False)
+        self.preference_dialog.audio_output.currentIndexChanged.connect(self.audio_output_prefs_index_changed)
+        self.preference_dialog.audio_output.setCurrentIndex(self.preference_dialog.audio_output.findText(self.tmpconfig['gst_audio_sink']))
+        self.prefs_fill_audio_sink_properties()
+        if self.preference_dialog.exec_():
+            if self.preference_dialog.startup_path_mode_specified_path.isChecked():
+                self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_SPECIFIED_PATH
+            elif self.preference_dialog.startup_path_mode_last_path.isChecked():
+                self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_LAST_PATH
+            elif self.preference_dialog.startup_path_mode_current_dir.isChecked():
+                self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_CURRENT_DIR
+            elif self.preference_dialog.startup_path_mode_home_dir.isChecked():
+                self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_HOME_DIR
+            self.tmpconfig['specified_path'] = self.preference_dialog.specified_path.text()
+            self.tmpconfig['file_extensions_filter'] = self.preference_dialog.file_extensions_filter.text().split(' ')
+            self.tmpconfig['gst_audio_sink'] = self.preference_dialog.audio_output.currentText()
+            self.config = self.tmpconfig
             self.refresh_config()
+            self.configure_audio_output()
+
+    @QtCore.Slot()
+    def audio_output_prefs_index_changed(self):
+        audiosink = self.preference_dialog.audio_output.currentText()
+        for o in [ self.preference_dialog.label_gst_aa_details, self.preference_dialog.label_aa_long_name,
+                   self.preference_dialog.audio_output_long_name, self.preference_dialog.label_aa_description,
+                   self.preference_dialog.audio_output_description, self.preference_dialog.audio_output_description,
+                   self.preference_dialog.label_aa_plugin, self.preference_dialog.audio_output_plugin,
+                   self.preference_dialog.label_aa_plugin_description, self.preference_dialog.audio_output_plugin_description,
+                   self.preference_dialog.label_aa_plugin_package, self.preference_dialog.audio_output_plugin_package,
+                   self.preference_dialog.label_aa_properties, self.preference_dialog.audio_output_properties ]:
+            o.setEnabled(audiosink != '(default)')
+        if audiosink == '(default)':
+            factory = None
+            for o in [ self.preference_dialog.audio_output_long_name, self.preference_dialog.audio_output_description,
+                       self.preference_dialog.audio_output_plugin, self.preference_dialog.audio_output_plugin_description,
+                       self.preference_dialog.audio_output_plugin_package ]:
+                o.setText('')
+            self.preference_dialog.audio_output_properties.clear()
+        else:
+            factory = self.available_gst_audio_sink_factories[audiosink]
+            self.preference_dialog.audio_output_long_name.setText(factory.get_metadata('long-name'))
+            self.preference_dialog.audio_output_description.setText(factory.get_metadata('description'))
+            self.preference_dialog.audio_output_plugin.setText(factory.get_plugin().get_name())
+            self.preference_dialog.audio_output_plugin_description.setText(factory.get_plugin().get_description())
+            self.preference_dialog.audio_output_plugin_package.setText(factory.get_plugin().get_package())
+            self.prefs_fill_audio_sink_properties()
 
     def tableView_contextMenuEvent(self, event):
         index = self.tableView.indexAt(event.pos())
@@ -927,6 +1081,7 @@ if __name__ == '__main__':
         LOG.setLevel(logging.DEBUG)
     else:
         LOG.setLevel(logging.INFO)
+    Gst.init(None)
     app = QtWidgets.QApplication([])
     sb = SoundBrowser(args.startup_path, app.clipboard(), args.conf_file)
     def signal_handler(sig, frame):
