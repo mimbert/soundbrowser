@@ -36,6 +36,10 @@ NON-goals:
 
 * advanced features
 
+## License
+
+MIT license
+
 ## Dependencies
 
 * gstreamer, qt, python3, pyside2
