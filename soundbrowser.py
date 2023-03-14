@@ -19,7 +19,7 @@ BLOCKING_GET_STATE_TIMEOUT = 1000 * Gst.MSECOND
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 def log_callstack():
-    LOG.debug(brightmagenta("callstack:\n" + "".join(traceback.format_list(traceback.extract_stack())[:-1])))
+    log.debug(brightmagenta("callstack:\n" + "".join(traceback.format_list(traceback.extract_stack())[:-1])))
 
 def cyan(s):
     return '\033[36m' + s + '\033[m'
@@ -44,11 +44,11 @@ class CustomFormatter(logging.Formatter):
     def format(self, record):
         return self.FORMATTERS.get(record.levelno).format(record)
 
-LOG = logging.getLogger()
+log = logging.getLogger()
 _handler = logging.StreamHandler(sys.stdout)
 _handler.setFormatter(CustomFormatter())
 _handler.setLevel(logging.DEBUG)
-LOG.addHandler(_handler)
+log.addHandler(_handler)
 
 STARTUP_PATH_MODE_SPECIFIED_PATH = 1
 STARTUP_PATH_MODE_LAST_PATH = 2
@@ -72,23 +72,23 @@ conf_schema = schema.Schema({
 })
 
 def load_conf(path):
-    LOG.debug(f"loading conf from {path}")
+    log.debug(f"loading conf from {path}")
     try:
         with open(path) as fh:
             conf = yaml.safe_load(fh)
     except OSError:
-        LOG.debug(f"error reading conf from {path}, using an empty conf")
+        log.debug(f"error reading conf from {path}, using an empty conf")
         conf = {}
     return conf_schema.validate(conf)
 
 def save_conf(path, conf):
     conf = conf_schema.validate(conf)
-    LOG.debug(f"saving conf to {path}")
+    log.debug(f"saving conf to {path}")
     try:
         with open(path, 'w') as fh:
             yaml.dump(conf, fh)
     except OSError:
-        LOG.debug(f"unable to save conf to {path}")
+        log.debug(f"unable to save conf to {path}")
 
 _blacklisted_gst_audio_sink_factory_regexes = [
     '^interaudiosink$',
@@ -142,7 +142,7 @@ class LRU(collections.OrderedDict):
         super().__setitem__(key, value)
         if len(self) > self.maxsize:
             oldest = next(iter(self))
-            LOG.debug(f"LRU max size, removing {oldest}")
+            log.debug(f"LRU max size, removing {oldest}")
             del self[oldest]
 
 def parse_tag_list(taglist):
@@ -231,13 +231,13 @@ def set_pixmap(qlabel, qpixmap):
     qlabel.setPixmap(qpixmap.scaled(w, h, QtCore.Qt.KeepAspectRatio))
 
 def log_gst_message(message):
-    LOG.debug(cyan(f"gst message: {message.type.first_value_name}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
+    log.debug(cyan(f"gst message: {message.type.first_value_name}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
 
 class Sound(QtCore.QObject):
 
     def __init__(self, path = None, stat_result = None):
         super().__init__()
-        LOG.debug(f"new sound path={path} stat={stat_result}")
+        log.debug(f"new sound path={path} stat={stat_result}")
         self.metadata = { None: {}, 'all': {} }
         self.path = path
         self.stat_result = stat_result
@@ -256,7 +256,7 @@ def file_changed(sound):
     try:
         stat_result = os.stat(sound.path)
     except:
-        LOG.debug(f"file_changed?: unable to stat {sound.path}")
+        log.debug(f"file_changed?: unable to stat {sound.path}")
         return True
     return stat_result.st_mtime_ns > sound.stat_result.st_mtime_ns
 
@@ -268,16 +268,16 @@ class SoundManager():
     def get(self, path, force_reload=False ):
         if path in self._cache and not force_reload:
             if not os.path.isfile(path):
-                LOG.debug(f"SoundManager: sound in cache, but there is no file anymore, discard it ({self._cache[path]})")
+                log.debug(f"SoundManager: sound in cache, but there is no file anymore, discard it ({self._cache[path]})")
                 del self._cache[path]
                 return None
             sound = self._cache[path]
             if file_changed(sound):
-                LOG.debug(f"SoundManager: sound in cache but changed on disk, reload it ({self._cache[path]})")
+                log.debug(f"SoundManager: sound in cache but changed on disk, reload it ({self._cache[path]})")
                 return self._load(path)
             return sound
         else:
-            LOG.debug(f"SoundManager: sound not in cache, or reload forced, load it ({path})")
+            log.debug(f"SoundManager: sound not in cache, or reload forced, load it ({path})")
             return self._load(path)
 
     def is_loaded(self, path):
@@ -285,12 +285,12 @@ class SoundManager():
 
     def _load(self, path):
         if not os.path.isfile(path):
-            LOG.debug(f"SoundManager: not an existing file, unable to load {path}")
+            log.debug(f"SoundManager: not an existing file, unable to load {path}")
             return None
         try:
             stat_result=os.stat(path)
         except:
-            LOG.debug(f"SoundManager: unable to stat, unable to load {path}")
+            log.debug(f"SoundManager: unable to stat, unable to load {path}")
             return None
         sound = Sound(path=path, stat_result=stat_result)
         self._cache[path] = sound
@@ -434,29 +434,29 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.bottom_pane.hide()
 
     def configure_audio_output(self):
-        LOG.debug(f"check gst sink {self.config['gst_audio_sink']} available")
+        log.debug(f"check gst sink {self.config['gst_audio_sink']} available")
         if self.config['gst_audio_sink'] not in self.available_gst_audio_sink_factories:
-            LOG.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}', using default")
+            log.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}', using default")
             self.config['gst_audio_sink'] = ''
         if self.config['gst_audio_sink']:
             if self.config['gst_audio_sink'] not in self.config['gst_audio_sink_properties']:
                 self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']] = {}
             available_properties = get_available_gst_factory_supported_properties(self.config['gst_audio_sink'])
             for config_prop in list(self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']].keys()):
-                LOG.debug(f"check gst sink property {config_prop} available for {self.config['gst_audio_sink']}")
+                log.debug(f"check gst sink property {config_prop} available for {self.config['gst_audio_sink']}")
                 if config_prop not in available_properties:
-                    LOG.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}' property '{config_prop}', removing it from config")
+                    log.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}' property '{config_prop}', removing it from config")
                     del self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']][config_prop]
             audiosink = Gst.ElementFactory.make(self.config['gst_audio_sink'])
             for k, v in self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']].items():
                 try:
                     audiosink.set_property(k, cast_str_to_prop_pytype(available_properties[k], v))
                 except:
-                    LOG.error(f"gst sink {self.config['gst_audio_sink']}: unable to set property {k} to value {cast_str_to_prop_pytype(available_properties[k], v)}")
+                    log.error(f"gst sink {self.config['gst_audio_sink']}: unable to set property {k} to value {cast_str_to_prop_pytype(available_properties[k], v)}")
             try:
                 self.player.set_property("audio-sink", audiosink)
             except:
-                LOG.error(f"gst playbin: unable to set audiosink to {self.config['gst_audio_sink']}")
+                log.error(f"gst playbin: unable to set audiosink to {self.config['gst_audio_sink']}")
 
     def populate(self, startup_path):
         self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
@@ -685,14 +685,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def tableview_selection_changed(self, selected, deselected):
-        LOG.debug(f"tableview_selection_changed  len(selected)={len(selected)}")
+        log.debug(f"tableview_selection_changed  len(selected)={len(selected)}")
         if len(selected) == 1:
             self.select_path()
 
     @QtCore.Slot()
     def tableView_return_pressed(self):
         self.tableView.selectionModel().selectedRows()
-        LOG.debug(f"tableview_return_pressed  len(self.tableView.selectionModel().selectedRows())={len(self.tableView.selectionModel().selectedRows())}")
+        log.debug(f"tableview_return_pressed  len(self.tableView.selectionModel().selectedRows())={len(self.tableView.selectionModel().selectedRows())}")
         if len(self.tableView.selectionModel().selectedRows()) == 1:
             self.select_path()
             fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
@@ -936,7 +936,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.state = SoundState.STOPPED
         self.disable_seek_pos_updates()
         self.seek_slider.setValue(100.0)
-        LOG.debug(f"sound reached end")
+        log.debug(f"sound reached end")
 
     def gst_bus_message_handler(self, bus, message, *user_data):
         if message.type == Gst.MessageType.SEGMENT_DONE:
@@ -971,16 +971,16 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.current_sound_playing.update_metadata(metadata)
             self.update_metadata_to_current_playing_message.emit()
         elif message.type == Gst.MessageType.WARNING:
-            LOG.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
+            log.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
         elif message.type == Gst.MessageType.ERROR:
-            LOG.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+            log.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
         return True
 
     @QtCore.Slot()
     def seek_position_updater(self):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
         got_position, position = self.player.query_position(Gst.Format.TIME)
-        # LOG.debug(cyan(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}"))
+        # log.debug(cyan(f"seek pos update got_position={got_position} position={position} got_duration={got_duration} duration={duration}"))
         if got_duration:
             if 'duration' not in self.current_sound_playing.metadata[None] or 'duration' not in self.current_sound_playing.metadata['all']:
                 self.current_sound_playing.metadata[None]['duration'] = self.current_sound_playing.metadata['all']['duration'] = duration
@@ -993,25 +993,25 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                     self.notify_sound_stopped()
 
     def enable_seek_pos_updates(self):
-        LOG.debug(f"enable seek pos updates")
+        log.debug(f"enable seek pos updates")
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
 
     def disable_seek_pos_updates(self):
-        LOG.debug(f"disable seek pos updates")
+        log.debug(f"disable seek pos updates")
         self.seek_pos_update_timer.stop()
 
     def update_player_path(self, sound):
-        LOG.debug(f"update_player_path to {sound.path}")
+        log.debug(f"update_player_path to {sound.path}")
         self.player.set_state(Gst.State.NULL)
         uri = pathlib.Path(sound.path).as_uri()
         self.player.set_property('uri', uri)
         self.current_sound_playing = sound
 
     def play(self, start_pos=None):
-        LOG.debug(f"play {self}")
+        log.debug(f"play {self}")
         if (not self.current_sound_selected) and (not self.current_sound_playing):
-            LOG.error(f"play called with no sound selected nor playing")
+            log.error(f"play called with no sound selected nor playing")
             return
         if self.state == SoundState.PLAYING:
             self.state = SoundState.STOPPED
@@ -1041,19 +1041,19 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.enable_seek_pos_updates()
 
     def pause(self):
-        LOG.debug(f"pause {self}")
+        log.debug(f"pause {self}")
         if not self.state == SoundState.PLAYING:
-            LOG.error(f"pause called with state = {self.state.name}")
+            log.error(f"pause called with state = {self.state.name}")
             return
         if not self.current_sound_playing:
-            LOG.error(f"pause called with current_sound_playing = {self.current_sound_playing}")
+            log.error(f"pause called with current_sound_playing = {self.current_sound_playing}")
             return
         self.player.set_state(Gst.State.PAUSED)
         self.state = SoundState.PAUSED
         self.disable_seek_pos_updates()
 
     def stop(self):
-        LOG.debug(f"stop {self}")
+        log.debug(f"stop {self}")
         self.player.set_state(Gst.State.PAUSED)
         self.player.seek(1.0,
                          Gst.Format.TIME,
@@ -1066,9 +1066,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.seek_slider.setValue(0.0)
 
     def seek(self, position):
-        LOG.debug(f"seek to {position} {self}")
+        log.debug(f"seek to {position} {self}")
         if self.seek_min_interval_timer != None:
-            LOG.debug(f"seek to {position} delayed to limit gst seek events frequency")
+            log.debug(f"seek to {position} delayed to limit gst seek events frequency")
             self.seek_next_value = position
         else:
             self.actual_seek(position)
@@ -1102,9 +1102,9 @@ if __name__ == '__main__':
     parser.add_argument('startup_path', nargs='?', help='open this path')
     args = parser.parse_args()
     if args.debug:
-        LOG.setLevel(logging.DEBUG)
+        log.setLevel(logging.DEBUG)
     else:
-        LOG.setLevel(logging.INFO)
+        log.setLevel(logging.INFO)
     Gst.init(None)
     app = QtWidgets.QApplication([])
     sb = SoundBrowser(args.startup_path, app.clipboard(), args.conf_file)
