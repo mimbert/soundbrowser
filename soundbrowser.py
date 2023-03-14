@@ -235,7 +235,7 @@ def log_gst_message(message):
 
 class Sound(QtCore.QObject):
 
-    def __init__(self, path = None, stat_result = None):
+    def __init__(self, path, stat_result):
         super().__init__()
         log.debug(f"new sound path={path} stat={stat_result}")
         self.metadata = { None: {}, 'all': {} }
