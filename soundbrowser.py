@@ -1134,4 +1134,7 @@ if __name__ == '__main__':
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
     sb.show()
+    signal_handler_timer = QtCore.QTimer()
+    signal_handler_timer.start(250)
+    signal_handler_timer.timeout.connect(lambda: None)
     sys.exit(app.exec_())
