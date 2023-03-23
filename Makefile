@@ -3,7 +3,7 @@ all: ui/main_win.py ui/prefs_dial.py soundbrowser_rc.py
 ui/%.py: ui/%.ui soundbrowser_rc.py
 	qtchooser -run-tool=uic -qt=5 $< -g python > $@
 
-soundbrowser_rc.py: ui/soundbrowser.qrc
+soundbrowser_rc.py: ui/soundbrowser.qrc ui/*.png
 	qtchooser -run-tool=rcc -qt=5 $< -g python > $@
 
 clean:
