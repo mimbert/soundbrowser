@@ -91,6 +91,7 @@ conf_schema = schema.Schema({
     schema.Optional('filter_files', default=True): bool,
     schema.Optional('gst_audio_sink', default=''): str,
     schema.Optional('gst_audio_sink_properties', default={}): {schema.Optional(str): {schema.Optional(str): str}},
+    schema.Optional('dark_theme', default=False): bool,
 })
 
 def load_conf(path):
@@ -440,6 +441,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         event.accept()
 
     def refresh_config(self):
+        set_dark_theme(self.config['dark_theme'])
         self.fs_model.show_hidden_files = self.config['show_hidden_files']
         fs_model_filter = QtCore.QDir.NoDotAndDotDot | QtCore.QDir.AllDirs
         dir_model_filter = QtCore.QDir.Files | QtCore.QDir.AllDirs
@@ -480,6 +482,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 log.error(f"gst playbin: unable to set audiosink to {self.config['gst_audio_sink']}")
 
     def populate(self, startup_path):
+        set_dark_theme(self.config['dark_theme'])
         self.fs_model = MyQFileSystemModel(self.config['show_hidden_files'], self)
         self.fs_model.setRootPath((QtCore.QDir.rootPath()))
         self.dir_model = QtWidgets.QFileSystemModel(self)
@@ -826,6 +829,8 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tmpconfig = copy.deepcopy(self.config)
         self.preference_dialog.check_autoplay_mouse.setChecked(self.tmpconfig['autoplay_mouse'])
         self.preference_dialog.check_autoplay_keyboard.setChecked(self.tmpconfig['autoplay_keyboard'])
+        self.preference_dialog.check_dark_theme.setChecked(self.tmpconfig['dark_theme'])
+        self.preference_dialog.check_dark_theme.stateChanged.connect(self.check_dark_theme_state_changed)
         self.preference_dialog.file_extensions_filter.setText(' '.join(self.tmpconfig['file_extensions_filter']))
         self.preference_dialog.specified_path.setText(self.tmpconfig['specified_path'])
         if self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
@@ -860,6 +865,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.config = self.tmpconfig
             self.refresh_config()
             self.configure_audio_output()
+        else:
+            self.refresh_config()
+
+    @QtCore.Slot()
+    def check_dark_theme_state_changed(self):
+        self.tmpconfig['dark_theme'] = self.preference_dialog.check_dark_theme.isChecked()
+        set_dark_theme(self.preference_dialog.check_dark_theme.isChecked())
 
     @QtCore.Slot()
     def audio_output_prefs_index_changed(self):
@@ -1136,6 +1148,26 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                              Gst.SeekType.SET, seek_pos,
                              Gst.SeekType.NONE, 0)
 
+def set_dark_theme(dark):
+    if dark:
+        palette = QtGui.QPalette()
+        palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
+        palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
+        palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
+        palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
+        palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.black)
+        palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
+        palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
+        palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
+        palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
+        palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
+        palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
+        palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
+        palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
+        app.setPalette(palette)
+    else:
+        app.setPalette(app.default_palette)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sound Browser')
     parser.add_argument('-d', '--debug', action='store_true', help='enable debug output')
@@ -1148,6 +1180,8 @@ if __name__ == '__main__':
         log.setLevel(logging.INFO)
     Gst.init(None)
     app = QtWidgets.QApplication([])
+    app.setStyle("Fusion")
+    app.default_palette = app.palette()
     sb = SoundBrowser(args.startup_path, app.clipboard(), args.conf_file)
     def signal_handler(sig, frame):
         sb.clean_close()
