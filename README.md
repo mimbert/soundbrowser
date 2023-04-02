@@ -53,7 +53,13 @@ MIT license
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good
   gstreamer1.0-plugins-ugly
 
+* to build: qtchooser
+
 ## Build and install
+
+Compile the qt resources:
+
+    $ make
 
 Build a single embedded `soundbrowser` file:
 
