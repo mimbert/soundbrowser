@@ -457,10 +457,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.bottom_pane.hide()
 
     def configure_audio_output(self):
-        log.debug(f"check gst sink {self.config['gst_audio_sink']} available")
-        if self.config['gst_audio_sink'] not in self.available_gst_audio_sink_factories:
-            log.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}', using default")
-            self.config['gst_audio_sink'] = ''
+        if self.config['gst_audio_sink']:
+            log.debug(f"check gst sink {self.config['gst_audio_sink']} available")
+            if self.config['gst_audio_sink'] not in self.available_gst_audio_sink_factories:
+                log.info(f"unavailable gstreamer audio sink '{self.config['gst_audio_sink']}', using default")
+                self.config['gst_audio_sink'] = ''
         if self.config['gst_audio_sink']:
             if self.config['gst_audio_sink'] not in self.config['gst_audio_sink_properties']:
                 self.config['gst_audio_sink_properties'][self.config['gst_audio_sink']] = {}
