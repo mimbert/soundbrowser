@@ -64,7 +64,8 @@
          <item>
           <widget class="QToolButton" name="copy_path_button">
            <property name="toolTip">
-            <string>Copy path</string>
+            <string>Copy path
+Shortcut: Ctrl-C</string>
            </property>
            <property name="text">
             <string>...</string>
@@ -78,7 +79,8 @@
          <item>
           <widget class="QToolButton" name="paste_path_button">
            <property name="toolTip">
-            <string>Paste path</string>
+            <string>Paste path
+Shortcut: Ctrl-V</string>
            </property>
            <property name="text">
             <string>...</string>
@@ -663,6 +665,10 @@
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
+            <property name="toolTip">
+             <string>Toggle play looping
+Shortcut: l</string>
+            </property>
             <property name="text">
              <string>Loop</string>
             </property>
@@ -682,6 +688,10 @@
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>Toggle show metadata pane
+Shortcut: m</string>
             </property>
             <property name="text">
              <string>Metadata</string>
@@ -703,6 +713,10 @@
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
+            <property name="toolTip">
+             <string>Toggle show hidden files
+Shortcut: h</string>
+            </property>
             <property name="text">
              <string>Hidden</string>
             </property>
@@ -723,20 +737,95 @@
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
+            <property name="toolTip">
+             <string>Toggle filter files
+Shortcut: f</string>
+            </property>
             <property name="text">
              <string>Filter Files</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="Line" name="line_4">
+           <widget class="Line" name="line">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="reverse_button">
+            <property name="toolTip">
+             <string>Toggle reverse playback
+Shortcut: r</string>
+            </property>
+            <property name="text">
+             <string>Reverse</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="line_reverse_button">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="tune_value">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>Playback rate in semitones</string>
+            </property>
+            <property name="text">
+             <string>-00</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDial" name="tune_dial">
+            <property name="maximumSize">
+             <size>
+              <width>30</width>
+              <height>30</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>Adjust playback rate by semitones</string>
+            </property>
+            <property name="minimum">
+             <number>-12</number>
+            </property>
+            <property name="maximum">
+             <number>12</number>
+            </property>
+            <property name="pageStep">
+             <number>1</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="invertedAppearance">
+             <bool>false</bool>
+            </property>
+            <property name="invertedControls">
+             <bool>false</bool>
+            </property>
+            <property name="notchesVisible">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QSlider" name="seek_slider">
+            <property name="toolTip">
+             <string>Playback position</string>
+            </property>
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
@@ -748,7 +837,8 @@
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Play / Pause</string>
+             <string>Play / Pause
+Shortcut: Enter/Spacebar</string>
             </property>
             <property name="text">
              <string>...</string>
@@ -766,7 +856,8 @@
              <bool>false</bool>
             </property>
             <property name="toolTip">
-             <string>Stop</string>
+             <string>Stop
+Shortcut: ESC</string>
             </property>
             <property name="text">
              <string>...</string>

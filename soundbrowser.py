@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import os, os.path, collections, yaml, schema, signal, sys, pathlib, threading, logging, argparse, traceback, enum, re, copy
+import os, os.path, collections, yaml, schema, signal, sys, pathlib, logging, argparse, traceback, enum, re, copy
 
 from PySide2 import QtCore
 from PySide2 import QtGui
@@ -37,6 +37,9 @@ SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 200
 BLOCKING_GET_STATE_TIMEOUT = 1000 * Gst.MSECOND
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
+
+def get_semitone_ratio(semitones):
+    return pow(2, semitones/12.0)
 
 def log_callstack():
     log.debug(brightmagenta("callstack:\n" + "".join(traceback.format_list(traceback.extract_stack())[:-1])))
@@ -87,6 +90,10 @@ conf_schema = schema.Schema({
     schema.Optional('main_window_state', default=None): bytes,
     schema.Optional('splitter_state', default=None): bytes,
     schema.Optional('play_looped', default=False): bool,
+    schema.Optional('play_reverse', default=False): bool,
+    schema.Optional('hide_reverse', default=True): bool,
+    schema.Optional('hide_tune', default=True): bool,
+    schema.Optional('reset_tune_between_sounds', default=True): bool,
     schema.Optional('file_extensions_filter', default=['wav', 'mp3', 'aiff', 'flac', 'ogg', 'm4a', 'aac', 'wma', 'aiff', 'ape', 'wv', 'mpc', 'au', 's3m', 'xm', 'mod', 'it', 'dbm', 'mid' ]): [str],
     schema.Optional('filter_files', default=True): bool,
     schema.Optional('gst_audio_sink', default=''): str,
@@ -132,6 +139,29 @@ def get_available_gst_factory_supported_properties(factory_name):
             continue
         properties[p.name] = p
     return properties
+
+def set_state_blocking(element, state):
+    r = element.set_state(state)
+    if r == Gst.StateChangeReturn.ASYNC:
+        retcode, state, pending_state = element.get_state(BLOCKING_GET_STATE_TIMEOUT)
+        if retcode == Gst.StateChangeReturn.FAILURE:
+            log.warning(f"gst async state change failure on element {element} after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
+            log_callstack()
+        elif retcode == Gst.StateChangeReturn.ASYNC:
+            log.warning(f"gst async state change on element {element} still async after timeout of {BLOCKING_GET_STATE_TIMEOUT / Gst.MSECOND}ms. retcode: {retcode}, state: {state}, pending_state: {pending_state}")
+            log_callstack()
+        return retcode
+    return r
+
+def query_seek(element):
+    query = Gst.Query.new_seeking(Gst.Format.TIME)
+    query_retval = element.query(query)
+    if query_retval:
+        query_answer = query.parse_seeking()
+    else:
+        query_answer = None
+    log.debug(f"query seeking: ({query_retval}, {query_answer})")
+    return query_retval, query_answer
 
 def cast_str_to_prop_pytype(prop, s):
     if prop.value_type.name == 'gchararray':
@@ -401,6 +431,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.set_property('flags', self.player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)) # disable video, subtitles, visualisation
         self.configure_audio_output()
         self.player.get_bus().add_watch(GLib.PRIORITY_DEFAULT, self.gst_bus_message_handler, None)
+        self._playback_rate = 1.0
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
         self.seek_next_value = None
@@ -427,6 +458,13 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.play_button.setIcon(self.play_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
+
+    @property
+    def playback_rate(self):
+        if self.config['play_reverse']:
+            return - self._playback_rate
+        else:
+            return self._playback_rate
 
     def clean_close(self):
         self.config['main_window_geometry'] = self.saveGeometry().data()
@@ -455,6 +493,18 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.bottom_pane.show()
         else:
             self.bottom_pane.hide()
+        if self.config['hide_reverse']:
+            self.reverse_button.hide()
+            self.line_reverse_button.hide()
+        else:
+            self.reverse_button.show()
+            self.line_reverse_button.show()
+        if self.config['hide_tune']:
+            self.tune_dial.hide()
+            self.tune_value.hide()
+        else:
+            self.tune_dial.show()
+            self.tune_value.show()
 
     def configure_audio_output(self):
         if self.config['gst_audio_sink']:
@@ -481,6 +531,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.player.set_property("audio-sink", audiosink)
             except:
                 log.error(f"gst playbin: unable to set audiosink to {self.config['gst_audio_sink']}")
+        self.audiosink = self.player.get_property("audio-sink")
 
     def populate(self, startup_path):
         set_dark_theme(self.config['dark_theme'])
@@ -529,6 +580,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
         self.locationBar.returnPressed.connect(self.locationBar_return_pressed)
         self.prefs_button.clicked.connect(self.prefs_button_clicked)
+        self.seek_slider.orig_mousePressEvent = self.seek_slider.mousePressEvent
+        self.seek_slider.orig_mouseMoveEvent = self.seek_slider.mouseMoveEvent
+        self.seek_slider.orig_mouseReleaseEvent = self.seek_slider.mouseReleaseEvent
         self.seek_slider.mousePressEvent = self.slider_mousePressEvent
         self.seek_slider.mouseMoveEvent = self.slider_mouseMoveEvent
         self.seek_slider.mouseReleaseEvent = self.slider_mouseReleaseEvent
@@ -581,6 +635,14 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.copy_shortcut.activated.connect(self.mainwin_copy)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
+        self.tune_value.setFixedWidth(self.tune_value.height())
+        self.tune_value.setFixedHeight(self.tune_value.height())
+        self.tune_value.setText('0')
+        self.tune_dial.valueChanged.connect(self.tune_dial_valueChanged)
+        self.reverse_button.setChecked(self.config['play_reverse'])
+        self.reverse_button.clicked.connect(self.reverse_clicked)
+        reverse_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_R), self)
+        reverse_shortcut.activated.connect(self.reverse_shortcut_activated)
         self.preference_dialog = PrefsDialog(self)
         self.preference_dialog.setMinimumSize(self.preference_dialog.size())
         self.preference_dialog.setMaximumSize(self.preference_dialog.size())
@@ -626,7 +688,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         filepath = self.tableview_get_path(self.tableView.currentIndex())
         self.locationBar.setText(filepath)
         if fileinfo.isFile():
+            previous_current_sound_selected = self.current_sound_selected
             self.current_sound_selected = self.manager.get(filepath)
+            if self.current_sound_selected != previous_current_sound_selected:
+                if self.config['reset_tune_between_sounds']:
+                    self.tune_dial.setValue(0)
             if self.current_sound_selected:
                 self.update_metadata_pane(self.current_sound_selected.metadata)
             else:
@@ -832,6 +898,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.preference_dialog.check_autoplay_keyboard.setChecked(self.tmpconfig['autoplay_keyboard'])
         self.preference_dialog.check_dark_theme.setChecked(self.tmpconfig['dark_theme'])
         self.preference_dialog.check_dark_theme.stateChanged.connect(self.check_dark_theme_state_changed)
+        self.preference_dialog.check_hide_reverse.setChecked(self.tmpconfig['hide_reverse'])
+        self.preference_dialog.check_hide_tune.setChecked(self.tmpconfig['hide_tune'])
+        self.preference_dialog.check_reset_tune_between_sounds.setChecked(self.tmpconfig['reset_tune_between_sounds'])
         self.preference_dialog.file_extensions_filter.setText(' '.join(self.tmpconfig['file_extensions_filter']))
         self.preference_dialog.specified_path.setText(self.tmpconfig['specified_path'])
         if self.tmpconfig['startup_path_mode'] == STARTUP_PATH_MODE_SPECIFIED_PATH:
@@ -852,6 +921,9 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if self.preference_dialog.exec_():
             self.tmpconfig['autoplay_mouse'] = self.preference_dialog.check_autoplay_mouse.isChecked()
             self.tmpconfig['autoplay_keyboard'] = self.preference_dialog.check_autoplay_keyboard.isChecked()
+            self.tmpconfig['hide_reverse'] = self.preference_dialog.check_hide_reverse.isChecked()
+            self.tmpconfig['hide_tune'] = self.preference_dialog.check_hide_tune.isChecked()
+            self.tmpconfig['reset_tune_between_sounds'] = self.preference_dialog.check_reset_tune_between_sounds.isChecked()
             if self.preference_dialog.startup_path_mode_specified_path.isChecked():
                 self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_SPECIFIED_PATH
             elif self.preference_dialog.startup_path_mode_last_path.isChecked():
@@ -969,22 +1041,29 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def stop_clicked(self, checked):
         self.stop()
 
-    def slider_seek_to_pos(self, mouse_event):
-        position = QtWidgets.QStyle.sliderValueFromPosition(self.seek_slider.minimum(), self.seek_slider.maximum(), mouse_event.pos().x(), self.seek_slider.geometry().width())
-        if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
-            self.seek(position)
-        if self.state == SoundState.STOPPED:
-            if self.current_sound_selected:
-                self.play(position)
+    def get_slider_pos(self, mouse_event):
+        return QtWidgets.QStyle.sliderValueFromPosition(self.seek_slider.minimum(), self.seek_slider.maximum(), mouse_event.pos().x(), self.seek_slider.geometry().width())
 
     def slider_mousePressEvent(self, mouse_event):
-        self.slider_seek_to_pos(mouse_event)
+        self.disable_seek_pos_updates()
+        return self.seek_slider.orig_mousePressEvent(mouse_event)
 
     def slider_mouseMoveEvent(self, mouse_event):
-        self.slider_seek_to_pos(mouse_event)
+        return self.seek_slider.orig_mouseMoveEvent(mouse_event)
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        self.slider_seek_to_pos(mouse_event)
+        if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
+            self.seek(self.get_slider_pos(mouse_event))
+        else:
+            if self.current_sound_selected:
+                self.play(self.get_slider_pos(mouse_event))
+        self.enable_seek_pos_updates()
+        return True
+
+    @QtCore.Slot()
+    def tune_dial_valueChanged(self, value):
+        self.tune_value.setText(str(value))
+        self.update_playback_rate(value)
 
     def notify_sound_stopped(self):
         self.state = SoundState.STOPPED
@@ -992,16 +1071,33 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.seek_slider.setValue(100.0)
         log.debug(f"sound reached end")
 
+    @QtCore.Slot()
+    def reverse_clicked(self, checked = False):
+        self.config['play_reverse'] = checked
+        self.update_playback_rate()
+
+    @QtCore.Slot()
+    def reverse_shortcut_activated(self):
+        self.reverse_button.click()
+
     def gst_bus_message_handler(self, bus, message, *user_data):
         if message.type == Gst.MessageType.SEGMENT_DONE:
             log_gst_message(message)
             if self.config['play_looped']:
                 # normal looping when no seeking has been done
-                self.player.seek(1.0,
-                                 Gst.Format.TIME,
-                                 Gst.SeekFlags.SEGMENT,
-                                 Gst.SeekType.SET, 0,
-                                 Gst.SeekType.NONE, 0)
+                got_seek_query_answer, seek_query_answer = query_seek(self.player)
+                if got_seek_query_answer and seek_query_answer.seekable:
+                    self.player.seek(self.playback_rate,
+                                     Gst.Format.TIME,
+                                     Gst.SeekFlags.SEGMENT,
+                                     Gst.SeekType.SET, seek_query_answer.segment_start,
+                                     Gst.SeekType.SET, seek_query_answer.segment_end)
+                else:
+                    self.player.seek(self.playback_rate,
+                                     Gst.Format.TIME,
+                                     Gst.SeekFlags.SEGMENT,
+                                     Gst.SeekType.SET, 0,
+                                     Gst.SeekType.NONE, -1)
             else:
                 self.notify_sound_stopped()
         elif message.type == Gst.MessageType.EOS:
@@ -1010,11 +1106,19 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 # playing looped but a seek was done while playing
                 # so must do a full restart of the stream
                 self.player.set_state(Gst.State.PAUSED)
-                self.player.seek(1.0,
-                                 Gst.Format.TIME,
-                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                                 Gst.SeekType.SET, 0,
-                                 Gst.SeekType.NONE, 0)
+                got_seek_query_answer, seek_query_answer = query_seek(self.player)
+                if got_seek_query_answer and seek_query_answer.seekable:
+                    self.player.seek(self.playback_rate,
+                                     Gst.Format.TIME,
+                                     Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+                                     Gst.SeekType.SET, seek_query_answer.segment_start,
+                                     Gst.SeekType.SET, seek_query_answer.segment_end)
+                else:
+                    self.player.seek(self.playback_rate,
+                                     Gst.Format.TIME,
+                                     Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+                                     Gst.SeekType.SET, 0,
+                                     Gst.SeekType.NONE, -1)
                 self.player.set_state(Gst.State.PLAYING)
             else:
                 self.notify_sound_stopped()
@@ -1075,19 +1179,20 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.update_player_path(self.current_sound_selected)
             elif file_changed(self.current_sound_playing):
                 self.update_player_path(self.current_sound_playing)
-            self.player.set_state(Gst.State.PAUSED)
-            if self.config['play_looped']:
-                self.player.seek(1.0,
+            set_state_blocking(self.player, Gst.State.PAUSED)
+            got_seek_query_answer, seek_query_answer = query_seek(self.player)
+            if got_seek_query_answer and seek_query_answer.seekable:
+                self.player.seek(self.playback_rate,
                                  Gst.Format.TIME,
                                  Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                                 Gst.SeekType.SET, 0,
-                                 Gst.SeekType.NONE, 0)
-            else:
-                self.player.seek(1.0,
-                                 Gst.Format.TIME,
-                                 Gst.SeekFlags.FLUSH,
-                                 Gst.SeekType.SET, 0,
-                                 Gst.SeekType.NONE, 0)
+                                 Gst.SeekType.SET, seek_query_answer.segment_start,
+                                 Gst.SeekType.SET, seek_query_answer.segment_end)
+        else:
+            self.player.seek(self.playback_rate,
+                             Gst.Format.TIME,
+                             Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+                             Gst.SeekType.SET, 0,
+                             Gst.SeekType.NONE, -1)
         if start_pos != None:
             self.actual_seek(start_pos)
         self.player.set_state(Gst.State.PLAYING)
@@ -1109,18 +1214,25 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def stop(self):
         log.debug(f"stop {self}")
         self.player.set_state(Gst.State.PAUSED)
-        self.player.seek(1.0,
-                         Gst.Format.TIME,
-                         Gst.SeekFlags.FLUSH,
-                         Gst.SeekType.SET, 0,
-                         Gst.SeekType.NONE, 0)
+        got_seek_query_answer, seek_query_answer = query_seek(self.player)
+        if got_seek_query_answer and seek_query_answer.seekable:
+            self.player.seek(self.playback_rate,
+                             Gst.Format.TIME,
+                             Gst.SeekFlags.FLUSH,
+                             Gst.SeekType.SET, seek_query_answer.segment_start,
+                             Gst.SeekType.SET, seek_query_answer.segment_end)
+        else:
+            self.player.seek(self.playback_rate,
+                             Gst.Format.TIME,
+                             Gst.SeekFlags.FLUSH,
+                             Gst.SeekType.SET, 0,
+                             Gst.SeekType.NONE, -1)
         self.state = SoundState.STOPPED
         self.disable_seek_pos_updates()
         self._current_sound_playing = None
         self.seek_slider.setValue(0.0)
 
     def seek(self, position):
-        log.debug(f"seek to {position} {self}")
         if self.seek_min_interval_timer != None:
             log.debug(f"seek to {position} delayed to limit gst seek events frequency")
             self.seek_next_value = position
@@ -1141,13 +1253,63 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def actual_seek(self, position):
         got_duration, duration = self.player.query_duration(Gst.Format.TIME)
+        got_seek_query, seek_query_answer = query_seek(self.player)
         if got_duration:
             seek_pos = position * duration / 100.0
-            self.player.seek(1.0,
-                             Gst.Format.TIME,
-                             Gst.SeekFlags.FLUSH,
-                             Gst.SeekType.SET, seek_pos,
-                             Gst.SeekType.NONE, 0)
+            log.debug(f"seek to {format_duration(seek_pos)} {self}")
+            if self.playback_rate > 0.0:
+                self.player.seek(self.playback_rate,
+                                        Gst.Format.TIME,
+                                        Gst.SeekFlags.FLUSH,
+                                        Gst.SeekType.SET, seek_pos,
+                                        Gst.SeekType.SET, seek_query_answer.segment_end)
+            else:
+                self.player.seek(self.playback_rate,
+                                        Gst.Format.TIME,
+                                        Gst.SeekFlags.FLUSH,
+                                        Gst.SeekType.SET, seek_query_answer.segment_start,
+                                        Gst.SeekType.NONE, seek_pos)
+        else:
+            log.warning(f"unable to seek to {position}%, couldn't get duration")
+
+    def update_playback_rate(self, value=None):
+        if value != None:
+            self._playback_rate = get_semitone_ratio(value)
+            log.debug(f"update playback rate to {self.playback_rate} ({value} semitones)")
+        else:
+            log.debug(f"update playback rate to {self.playback_rate}")
+        if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
+            got_seek_query_answer, seek_query_answer = query_seek(self.player)
+            got_position, position = self.player.query_position(Gst.Format.TIME)
+            if got_position:
+                if self.playback_rate > 0.0:
+                    if got_seek_query_answer and seek_query_answer.seekable:
+                        self.player.seek(self.playback_rate,
+                                         Gst.Format.TIME,
+                                         Gst.SeekFlags.FLUSH,
+                                         Gst.SeekType.SET, position,
+                                         Gst.SeekType.SET, seek_query_answer.segment_end)
+                    else:
+                        self.player.seek(self.playback_rate,
+                                         Gst.Format.TIME,
+                                         Gst.SeekFlags.FLUSH,
+                                         Gst.SeekType.SET, position,
+                                         Gst.SeekType.NONE, -1)
+                else:
+                    if got_seek_query_answer and seek_query_answer.seekable:
+                        self.player.seek(self.playback_rate,
+                                         Gst.Format.TIME,
+                                         Gst.SeekFlags.FLUSH,
+                                         Gst.SeekType.SET, seek_query_answer.segment_start,
+                                         Gst.SeekType.SET, position)
+                    else:
+                        self.player.seek(self.playback_rate,
+                                         Gst.Format.TIME,
+                                         Gst.SeekFlags.FLUSH,
+                                         Gst.SeekType.NONE, -1,
+                                         Gst.SeekType.NONE, position)
+            else:
+                log.warning(f"update_playback_rate: got_position, position = {got_position}, {position}")
 
 def set_dark_theme(dark):
     if dark:
