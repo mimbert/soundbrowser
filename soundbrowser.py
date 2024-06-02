@@ -126,7 +126,7 @@ _blacklisted_gst_audio_sink_factory_regexes = [
 ]
 def get_available_gst_audio_sink_factories():
     factories = Gst.Registry.get().get_feature_list(Gst.ElementFactory)
-    audio_sinks_factories = [ f for f in factories if ('Audio' in f.get_klass() and ('sink' in f.name or 'Sink' in f.get_klass())) ]
+    audio_sinks_factories = [ f for f in factories if ('Audio' in f.get_metadata('klass') and ('sink' in f.name or 'Sink' in f.get_metadata('klass'))) ]
     for regex in _blacklisted_gst_audio_sink_factory_regexes:
         audio_sinks_factories = [ f for f in audio_sinks_factories if not re.search(regex, f.name) ]
     return { f.name: f for f in audio_sinks_factories }
