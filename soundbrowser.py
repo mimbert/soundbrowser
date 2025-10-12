@@ -38,6 +38,8 @@ SEEK_MIN_INTERVAL_MS = 200
 BLOCKING_GET_STATE_TIMEOUT = 1000 * Gst.MSECOND
 CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
+DEFAULT_SINK_DISPLAY_NAME = '(default)'
+
 def get_semitone_ratio(semitones):
     return pow(2, semitones/12.0)
 
@@ -913,7 +915,7 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.preference_dialog.startup_path_mode_home_dir.setChecked(True)
         self.preference_dialog.audio_output.blockSignals(True)
         self.preference_dialog.audio_output.clear()
-        self.preference_dialog.audio_output.addItems( ['(default)'] + [ fname for fname in self.available_gst_audio_sink_factories ])
+        self.preference_dialog.audio_output.addItems( [DEFAULT_SINK_DISPLAY_NAME] + [ fname for fname in self.available_gst_audio_sink_factories ])
         self.preference_dialog.audio_output.blockSignals(False)
         self.preference_dialog.audio_output.currentIndexChanged.connect(self.audio_output_prefs_index_changed)
         self.preference_dialog.audio_output.setCurrentIndex(self.preference_dialog.audio_output.findText(self.tmpconfig['gst_audio_sink']))
@@ -956,8 +958,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                    self.preference_dialog.label_aa_plugin_description, self.preference_dialog.audio_output_plugin_description,
                    self.preference_dialog.label_aa_plugin_package, self.preference_dialog.audio_output_plugin_package,
                    self.preference_dialog.label_aa_properties, self.preference_dialog.audio_output_properties ]:
-            o.setEnabled(audiosink != '(default)')
-        if audiosink == '(default)':
+            o.setEnabled(audiosink not in [ DEFAULT_SINK_DISPLAY_NAME, '' ])
+        if audiosink == '':
+            audiosink == DEFAULT_SINK_DISPLAY_NAME
+            #self.preference_dialog.audio_output.itemText(DEFAULT_SINK_DISPLAY_NAME)
+        if audiosink == DEFAULT_SINK_DISPLAY_NAME:
             factory = None
             for o in [ self.preference_dialog.audio_output_long_name, self.preference_dialog.audio_output_description,
                        self.preference_dialog.audio_output_plugin, self.preference_dialog.audio_output_plugin_description,
