@@ -1132,6 +1132,11 @@ class SoundBrowser(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             log.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
         elif message.type == Gst.MessageType.ERROR:
             log.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+        elif message.type == Gst.MessageType.ASYNC_DONE:
+            log_gst_message(message)
+        elif message.type == Gst.MessageType.STATE_CHANGED:
+            if message.src == self.player:
+                log_gst_message(message)
         return True
 
     @QtCore.Slot()
