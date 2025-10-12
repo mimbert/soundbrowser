@@ -40,6 +40,10 @@ CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 DEFAULT_SINK_DISPLAY_NAME = '(default)'
 
+def mybreakpoint():
+    import ipdb
+    ipdb.set_trace()
+
 def get_semitone_ratio(semitones):
     return pow(2, semitones/12.0)
 
