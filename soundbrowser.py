@@ -282,7 +282,7 @@ def set_pixmap(qlabel, qpixmap):
     qlabel.setPixmap(qpixmap.scaled(w, h, QtCore.Qt.KeepAspectRatio))
 
 def log_gst_message(message):
-    log.debug(cyan(f"gst message: {message.type.first_value_name}: {message.get_structure().to_string() if message.get_structure() else 'None'}"))
+    log.debug(cyan(f"gst message: {message.type.first_value_name} src: {message.src.get_name()}({message.src.__class__.__name__}) {message.get_structure().to_string() if message.get_structure() else 'None'}"))
 
 class Sound(QtCore.QObject):
 
