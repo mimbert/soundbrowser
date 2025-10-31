@@ -1,20 +1,23 @@
-all: ui/main_win.py ui/prefs_dial.py soundbrowser_rc.py
+all: lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/soundbrowser_rc.py
 
-ui/%.py: ui/%.ui soundbrowser_rc.py
-	qtchooser -run-tool=uic -qt=5 $< -g python > $@
+lib/ui_lib/%.py: lib/ui_lib/%.ui lib/ui_lib/soundbrowser_rc.py
+	qtchooser -run-tool=uic -qt=5 $< -g python --from-imports > $@
 
-soundbrowser_rc.py: ui/soundbrowser.qrc ui/*.png
+lib/ui_lib/soundbrowser_rc.py: lib/ui_lib/soundbrowser.qrc lib/ui_lib/*.png
 	qtchooser -run-tool=rcc -qt=5 $< -g python > $@
 
+
 clean:
-	rm -rf ui/main_win.py soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
+	rm -rf lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
+	find . -type d -name __pycache__ -exec rm -rf {} +
 
 dist: all
-	mkdir -p build/ui
-	cp *.py build/
+	rsync -am --delete --include='*.py' --include='*.png' --exclude='build/' --include='*/' --exclude='*' . build/
 	mv build/soundbrowser.py build/__main__.py
-	cp ui/*.py ui/*.png build/ui/
-	cd build && zip ../soundbrowser.zip * ui/*
+	cd build && zip -r ../soundbrowser.zip *
 	echo '#!/usr/bin/env python3' | cat - soundbrowser.zip > soundbrowser
 	rm soundbrowser.zip
 	chmod a+x soundbrowser
+
+design:
+	lib/ui_lib/designer
