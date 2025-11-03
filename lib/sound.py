@@ -6,7 +6,8 @@ from gi.repository import GObject, Gst, GLib
 from PySide2 import QtCore
 
 CACHE_SIZE = 256
-SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't do correctly (especially with pipewiresink)
+SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't
+                    # do correctly (especially with pipewiresink)
 LOG_ALL_GST_MESSAGES = True
 
 class PlayerStates(enum.Enum):
@@ -207,19 +208,6 @@ def parse_tag_list(taglist):
     return containers
 
 # ------------------------------------------------------------------------
-# convenient function to get current seeking position
-
-def query_seek(element):
-    query = Gst.Query.new_seeking(Gst.Format.TIME)
-    query_retval = element.query(query)
-    if query_retval:
-        query_answer = query.parse_seeking()
-    else:
-        query_answer = None
-    log.debug(f"query seeking: success={query_retval}, answer={query_answer})")
-    return query_retval, query_answer
-
-# ------------------------------------------------------------------------
 # convert semitones to playback rate
 
 def get_semitone_ratio(semitones):
@@ -247,7 +235,11 @@ class SoundPlayer():
             Gst.SeekType.SET, 0,
             Gst.SeekType.NONE, 0)
 
+    # ------------------------------------------------------------------------
+    # output sink config
+
     def configure_audio_output(self):
+        # TODO: don't access config struct directly (for sink properties)
         gst_sink_factory_name = config['gst_audio_sink']
         available_gst_audio_sink_factories = get_available_gst_audio_sink_factories()
         if gst_sink_factory_name:
@@ -288,10 +280,8 @@ class SoundPlayer():
             log.debug(f"gst playbin has no explcit sink set, will use the default sink")
         config['gst_audio_sink'] = actual_gst_sink_factory_name
 
-    def get_duration_position(self):
-        got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
-        got_position, position = self.gst_playerplayer.query_position(Gst.Format.TIME)
-        return duration if got_duration else None, position if got_position else None
+    # ------------------------------------------------------------------------
+    # playback rate
 
     @property
     def semitone(self):
@@ -301,6 +291,9 @@ class SoundPlayer():
     def semitone(self, value):
         self._semitone = value
         self._playback_rate = get_semitone_ratio(value) * self.playback_direction.value
+
+    # ------------------------------------------------------------------------
+    # gst messages / player messages utils
 
     def log_gst_message(self, gst_message):
         if gst_message.src == None:
@@ -319,18 +312,15 @@ class SoundPlayer():
             Gst.MessageType.APPLICATION,
             None,
             gst_message_structure)
-        # mettre le self.bus.post(message) dans un with cond var pour qu'ensuite le wait de la cond var on soit sur de voir passer le changement d'état
+        # MAYBE TODO: puy self.bus.post(message) in a wait cond var to
+        # be sure to "see" the state change (in case it's too false)
         log.debug(f"sending player message {dump_player_message(gst_message)}")
         self.bus.post(gst_message)
 
-    def dump_state_machine_args(self, args):
-        return f"gst_msg={dump_gst_message(args.gst_msg)} player_msg={dump_player_message(args.player_msg) if args.player_msg else args.player_msg}"
+    # ------------------------------------------------------------------------
+    # gst async utils
 
-    def log_state_machine_error(self, args):
-        log.error(f"sound player state machine error: current_state={self._player_state} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
-        log_callstack()
-
-    def _wait_state_change(self, state_change_retval, preroll_is_error=False):
+    def _wait_gst_state_change(self, state_change_retval, preroll_is_error=False):
         if (state_change_retval == Gst.StateChangeReturn.FAILURE
             or (preroll_is_error
                 and state_change_retval == Gst.StateChangeReturn.NO_PREROLL)):
@@ -361,7 +351,7 @@ class SoundPlayer():
     def _set_uri(self, uri, next_state):
         log.debug(f"set gst state to READY")
         state_change_retval = self.gst_player.set_state(Gst.State.READY)
-        yield from self._wait_state_change(state_change_retval)
+        yield from self._wait_gst_state_change(state_change_retval)
         log.debug(f"set property uri of gst player to '{uri}'")
         self.gst_player.set_property('uri', uri)
         flags = self.gst_player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)
@@ -369,11 +359,16 @@ class SoundPlayer():
         log.debug(f"set flags of gst player to 0x{flags:08x}")
         self.gst_player.set_property('flags',
                                      flags)
-        log.debug(f"set gst state to PAUSED")
-        state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-        yield from self._wait_state_change(state_change_retval)
-        yield from self._send_seek(self.reset_seek)
+        # following 4 lines not needed anymore: the gst state
+        # corresponding to player state paused is gst_ready
+        # log.debug(f"set gst state to PAUSED")
+        # state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+        # yield from self._wait_gst_state_change(state_change_retval)
+        # yield from self._send_seek(self.reset_seek)
         yield next_state
+
+    # ------------------------------------------------------------------------
+    # player state transition handlers
 
     def _unknown_state_transition_handler(self):
         args = yield None
@@ -385,82 +380,37 @@ class SoundPlayer():
         args = yield None
         while args.player_msg not in [ PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI ]:
             args = yield None
-
         if args.player_msg == PlayerMessages.SET_URI:
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.PAUSED)
         else:
-            # set to pause before seeking/playing.
-            # This part of code causes no issue (checked with pulse, openal, pipewire)
             log.debug(f"set gst state to PAUSED")
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-            yield from self._wait_state_change(state_change_retval)
-
-            # This part of code causes no issue (checked with pulse, openal, pipewire)
-            # got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-
-            # This part of code causes no issue (checked with pulse, openal, pipewire)
-            # if got_seek_query_answer and seek_query_answer.seekable:
-            # if False:
-            #     seek_event = Gst.Event.new_seek(
-            #         self._playback_rate,
-            #         Gst.Format.TIME,
-            #         Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-            #         Gst.SeekType.SET, seek_query_answer.segment_start,
-            #         Gst.SeekType.SET, seek_query_answer.segment_end)
-            # else:
-            #     seek_event = Gst.Event.new_seek(
-            #         self._playback_rate,
-            #         Gst.Format.TIME,
-            #         Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-            #         Gst.SeekType.SET, 0,
-            #         Gst.SeekType.NONE, -1)
-
-            # PROBLEM IS HERE
-            # avec openal et pipewire: ne recevra jamais le EOS
-            # avec pulse: reçoit le EOS mais pas de son
-            # si j'envoie le myseek alloué dans la main thread il reçoit un segment done
-            # si j'envoie le seek alloué ici il reçoit jamais ni segment done ni eos
-
+            yield from self._wait_gst_state_change(state_change_retval)
             yield from self._send_seek(self.reset_seek)
-
             log.debug(f"set gst state to PLAYING")
             state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
-            yield from self._wait_state_change(state_change_retval, preroll_is_error=True)
+            yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
             yield PlayerStates.PLAYING
 
     def _playing_state_transition_handler(self):
         args = yield None
-        if args.gst_msg.type == Gst.MessageType.SEGMENT_DONE:
-            log.debug(f"set gst state to PAUSED")
-            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-            yield from self._wait_state_change(state_change_retval)
-            log.debug(f"set gst state to READY")
-            state_change_retval = self.gst_player.set_state(Gst.State.READY)
-            yield from self._wait_state_change(state_change_retval)
-            #yield from self._send_seek(self.reset_seek)
-            yield PlayerStates.PAUSED
-        elif args.gst_msg.type == Gst.MessageType.EOS:
-            log.debug(f"set gst state to PAUSED")
-            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-            yield from self._wait_state_change(state_change_retval)
-            log.debug(f"set gst state to READY")
-            state_change_retval = self.gst_player.set_state(Gst.State.READY)
-            yield from self._wait_state_change(state_change_retval)
-            #yield from self._send_seek(self.reset_seek)
-            yield PlayerStates.PAUSED
-        elif args.player_msg == PlayerMessages.ASK_PAUSE:
-            log.debug(f"set gst state to PAUSED")
-            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-            yield from self._wait_state_change(state_change_retval)
-            log.debug(f"set gst state to READY")
-            state_change_retval = self.gst_player.set_state(Gst.State.READY)
-            yield from self._wait_state_change(state_change_retval)
-            #yield from self._send_seek(self.reset_seek)
-            yield PlayerStates.PAUSED
+        while not ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
+                    or args.player_msg == PlayerMessages.ASK_PAUSE ):
+            args = yield None
+        log.debug(f"set gst state to PAUSED")
+        state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+        yield from self._wait_gst_state_change(state_change_retval)
+        log.debug(f"set gst state to READY")
+        state_change_retval = self.gst_player.set_state(Gst.State.READY)
+        yield from self._wait_gst_state_change(state_change_retval)
+        yield PlayerStates.PAUSED
 
     def _error_state_transition_handler(self):
         while True:
             args = yield None
+
+    # ------------------------------------------------------------------------
+    # player states transitions matrix
 
     _msg_player_state_handlers = {
         PlayerStates.UNKNOWN: (
@@ -492,6 +442,16 @@ class SoundPlayer():
         ),
     }
 
+    # ------------------------------------------------------------------------
+    # player state machine utils
+
+    def dump_state_machine_args(self, args):
+        return f"gst_msg={dump_gst_message(args.gst_msg)} player_msg={dump_player_message(args.player_msg) if args.player_msg else args.player_msg}"
+
+    def log_state_machine_error(self, args):
+        log.error(f"sound player state machine error: current_state={self._player_state} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
+        log_callstack()
+
     def wait_player_state(self, player_states):
         while self._player_state not in player_states:
             with self._player_state_change_cv:
@@ -515,6 +475,9 @@ class SoundPlayer():
             next(self._player_state_handler)
             log.debug(brightcyan(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}"))
             self._player_state_change_cv.notify()
+
+    # ------------------------------------------------------------------------
+    # gst bus handler
 
     def _gst_bus_message_handler(self, bus, message, *user_data):
         if LOG_ALL_GST_MESSAGES:
@@ -554,6 +517,9 @@ class SoundPlayer():
                     log.debug(brightmagenta(f"player state stays {self._player_state}"))
         return True
 
+    # ------------------------------------------------------------------------
+    # public interface
+
     def set_path(self, path):
         with self._lock:
             uri = pathlib.Path(path).as_uri()
@@ -575,48 +541,6 @@ class SoundPlayer():
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
-
-    def stop(self):
-        log.debug(f"gst stop")
-        self.gst_player.set_state(Gst.State.PAUSED)
-        got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        if got_seek_query_answer and seek_query_answer.seekable:
-            self.player.seek(
-                self._playback_rate,
-                Gst.Format.TIME,
-                Gst.SeekFlags.FLUSH,
-                Gst.SeekType.SET, seek_query_answer.segment_start,
-                Gst.SeekType.SET, seek_query_answer.segment_end)
-        else:
-            self.player.seek(
-                self._playback_rate,
-                Gst.Format.TIME,
-                Gst.SeekFlags.FLUSH,
-                Gst.SeekType.SET, 0,
-                Gst.SeekType.NONE, -1)
-
-    def seek(self, position):
-        got_duration, duration = self.player.query_duration(Gst.Format.TIME)
-        got_seek_query, seek_query_answer = query_seek(self.player)
-        if got_duration:
-            seek_pos = position * duration / 100.0
-            log.debug(f"seek to {format_duration(seek_pos)}")
-            if self._playback_rate > 0.0:
-                self.player.seek(
-                    self._playback_rate,
-                    Gst.Format.TIME,
-                    Gst.SeekFlags.FLUSH,
-                    Gst.SeekType.SET, seek_pos,
-                    Gst.SeekType.SET, seek_query_answer.segment_end)
-            else:
-                self.player.seek(
-                    self._playback_rate,
-                    Gst.Format.TIME,
-                    Gst.SeekFlags.FLUSH,
-                    Gst.SeekType.SET, seek_query_answer.segment_start,
-                    Gst.SeekType.NONE, seek_pos)
-        else:
-            log.warning(f"unable to seek to {position}%, couldn't get duration")
 
 class Sound():
 
