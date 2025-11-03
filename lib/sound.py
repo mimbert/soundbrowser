@@ -6,7 +6,7 @@ from gi.repository import GObject, Gst, GLib
 from PySide2 import QtCore
 
 CACHE_SIZE = 256
-SLEEP_HACK_TIME = 0.1 # ugly workaround for gst bug or something i don't do correctly (especially with pipewiresink)
+SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't do correctly (especially with pipewiresink)
 LOG_ALL_GST_MESSAGES = True
 
 class PlayerStates(enum.Enum):
@@ -301,39 +301,6 @@ class SoundPlayer():
     def semitone(self, value):
         self._semitone = value
         self._playback_rate = get_semitone_ratio(value) * self.playback_direction.value
-        # got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        # got_position, position = self.gst_player.query_position(Gst.Format.TIME)
-        # if got_position:
-        #     if self._playback_rate > 0.0:
-        #         if got_seek_query_answer and seek_query_answer.seekable:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.FLUSH,
-        #                 Gst.SeekType.SET, position,
-        #                 Gst.SeekType.SET, seek_query_answer.segment_end)
-        #         else:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.FLUSH,
-        #                 Gst.SeekType.SET, position,
-        #                 Gst.SeekType.NONE, -1)
-        #     else:
-        #         if got_seek_query_answer and seek_query_answer.seekable:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.FLUSH,
-        #                 Gst.SeekType.SET, seek_query_answer.segment_start,
-        #                 Gst.SeekType.SET, position)
-        #         else:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.FLUSH,
-        #                 Gst.SeekType.NONE, -1,
-        #                 Gst.SeekType.NONE, position)
 
     def log_gst_message(self, gst_message):
         if gst_message.src == None:
@@ -467,19 +434,28 @@ class SoundPlayer():
             log.debug(f"set gst state to PAUSED")
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_state_change(state_change_retval)
-            yield from self._send_seek(self.reset_seek)
+            log.debug(f"set gst state to READY")
+            state_change_retval = self.gst_player.set_state(Gst.State.READY)
+            yield from self._wait_state_change(state_change_retval)
+            #yield from self._send_seek(self.reset_seek)
             yield PlayerStates.PAUSED
         elif args.gst_msg.type == Gst.MessageType.EOS:
             log.debug(f"set gst state to PAUSED")
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_state_change(state_change_retval)
-            yield from self._send_seek(self.reset_seek)
+            log.debug(f"set gst state to READY")
+            state_change_retval = self.gst_player.set_state(Gst.State.READY)
+            yield from self._wait_state_change(state_change_retval)
+            #yield from self._send_seek(self.reset_seek)
             yield PlayerStates.PAUSED
         elif args.player_msg == PlayerMessages.ASK_PAUSE:
             log.debug(f"set gst state to PAUSED")
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_state_change(state_change_retval)
-            yield from self._send_seek(self.reset_seek)
+            log.debug(f"set gst state to READY")
+            state_change_retval = self.gst_player.set_state(Gst.State.READY)
+            yield from self._wait_state_change(state_change_retval)
+            #yield from self._send_seek(self.reset_seek)
             yield PlayerStates.PAUSED
 
     def _error_state_transition_handler(self):
@@ -567,77 +543,15 @@ class SoundPlayer():
                 log.debug(brightmagenta(f"player state {self._player_state.name} received {dump_gst_message(message)}"))
                 new_player_state = self._player_state_handler.send(types.SimpleNamespace(gst_msg=message, player_msg=player_message))
                 if new_player_state != None:
+                    # note that if new_player_state is the same state
+                    # as before, it will still be handled as a state
+                    # change, which instanciate a new "state
+                    # transition" generator and will notify the state
+                    # change cond var
                     log.debug(brightmagenta(f"player state change from {self._player_state} to {new_player_state}"))
                     self.__change_player_state(new_player_state)
                 else:
                     log.debug(brightmagenta(f"player state stays {self._player_state}"))
-            # else:
-            #     log.debug(f"player state {self._player_state.name} ignores {dump_gst_message(message)}")
-        return True
-
-        # if message.type == Gst.MessageType.SEGMENT_DONE:
-        #     self.log_gst_message(message)
-        #     if config['play_looped']:
-        #         # normal looping when no seeking has been done
-        #         got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        #         if got_seek_query_answer and seek_query_answer.seekable:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.SEGMENT,
-        #                 Gst.SeekType.SET, seek_query_answer.segment_start,
-        #                 Gst.SeekType.SET, seek_query_answer.segment_end)
-        #         else:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.SEGMENT,
-        #                 Gst.SeekType.SET, 0,
-        #                 Gst.SeekType.NONE, -1)
-        #     # else:
-        #     #     self.notify_sound_stopped()
-        # elif message.type == Gst.MessageType.EOS:
-        #     self.log_gst_message(message)
-        #     if config['play_looped']:
-        #         # playing looped but a seek was done while playing
-        #         # so must do a full restart of the stream
-        #         self.gst_player.set_state(Gst.State.PAUSED)
-        #         got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        #         if got_seek_query_answer and seek_query_answer.seekable:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #                 Gst.SeekType.SET, seek_query_answer.segment_start,
-        #                 Gst.SeekType.SET, seek_query_answer.segment_end)
-        #         else:
-        #             self.gst_player.seek(
-        #                 self._playback_rate,
-        #                 Gst.Format.TIME,
-        #                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #                 Gst.SeekType.SET, 0,
-        #                 Gst.SeekType.NONE, -1)
-        #         self.gst_player.set_state(Gst.State.PLAYING)
-        #     else:
-        #         pass
-        #         #self.notify_sound_stopped()
-        # elif message.type == Gst.MessageType.TAG:
-        #     message_struct = message.get_structure()
-        #     taglist = message.parse_tag()
-        #     metadata = parse_tag_list(taglist)
-        #     # self.current_sound_playing.update_metadata(metadata)
-        #     # self.update_metadata_to_current_playing_message.emit()
-        # elif message.type == Gst.MessageType.WARNING:
-        #     log.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
-        # elif message.type == Gst.MessageType.ERROR:
-        #     log.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
-        # elif message.type == Gst.MessageType.ASYNC_DONE:
-        #     self.log_gst_message(message)
-        # elif message.type == Gst.MessageType.STATE_CHANGED:
-        #     if message.src == self.gst_player or log_all_gst_messages:
-        #         self.log_gst_message(message)
-        # elif log_all_gst_messages:
-        #     self.log_gst_message(message)
         return True
 
     def set_path(self, path):

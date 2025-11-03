@@ -48,14 +48,14 @@ if __name__ == '__main__':
     mainloop = GLib.MainLoop()
     threading.Thread(target=mainloop.run).start()
     player = SoundPlayer()
-    #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum.wav")
-    player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum_reverb.wav")
+    player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum.wav")
+    #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum_reverb.wav")
     #player.set_path("/home/mimbert/music/staging/tracks-mixing/01 01A1 Untitled.mp3")
     import time
     #time.sleep(0.1)
     while True:
         player.play()
-        time.sleep(5)
+        time.sleep(1)
         # player.pause()
         # time.sleep(10)
 
