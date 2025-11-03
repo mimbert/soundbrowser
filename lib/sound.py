@@ -6,32 +6,71 @@ from gi.repository import GObject, Gst, GLib
 from PySide2 import QtCore
 
 CACHE_SIZE = 256
-GST_BLOCKING_WAIT_TIMEOUT = 1000 * Gst.MSECOND
-log_all_gst_messages = True
-from enum import Enum
+SLEEP_HACK_TIME = 0.1 # ugly workaround for gst bug or something i don't do correctly (especially with pipewiresink)
+LOG_ALL_GST_MESSAGES = True
 
 class PlayerStates(enum.Enum):
     UNKNOWN = 0
     PAUSED = 1
     PLAYING = 3
+    ERROR = 4
 
 class PlayerMessages(enum.Enum):
     ASK_PAUSE = 0
     ASK_SEEK = 1
     ASK_PLAY = 2
     SEEK_COMPLETE = 3
+    SET_URI = 4
 
 class PlaybackDirection(enum.Enum):
     FORWARD = 1
     BACKWARD = -1
 
-def get_semitone_ratio(semitones):
-    return pow(2, semitones/12.0)
+# ------------------------------------------------------------------------
+# gst config
 
 _blacklisted_gst_audio_sink_factory_regexes = [
     '^interaudiosink$',
     '^ladspasink.*',
 ]
+
+def _get_empty_prop_specs(prop):
+    return {}
+
+def _get_boolean_prop_specs(prop):
+    return {
+        'values': [ (True, 'True'), (False, 'False') ],
+    }
+
+def _get_enum_prop_specs(prop):
+    values = []
+    for v in range(prop.enum_class.minimum, prop.enum_class.maximum + 1):
+        values.append((v, GObject.enum_to_string(prop.value_type, v)))
+    return {
+        'values': values,
+    }
+
+def _get_numeric_prop_specs(prop):
+    return {
+        'min': prop.minimum,
+        'max': prop.maximum,
+    }
+
+_supported_property_types = {
+    GObject.ParamSpecBoolean: _get_boolean_prop_specs,
+    GObject.ParamSpecEnum: _get_enum_prop_specs,
+    GObject.ParamSpecString: _get_empty_prop_specs,
+    GObject.ParamSpecChar: _get_numeric_prop_specs,
+    GObject.ParamSpecUChar: _get_numeric_prop_specs,
+    GObject.ParamSpecInt: _get_numeric_prop_specs,
+    GObject.ParamSpecUInt: _get_numeric_prop_specs,
+    GObject.ParamSpecInt64: _get_numeric_prop_specs,
+    GObject.ParamSpecUInt64: _get_numeric_prop_specs,
+    GObject.ParamSpecFloat: _get_numeric_prop_specs,
+    GObject.ParamSpecLong: _get_numeric_prop_specs,
+    GObject.ParamSpecULong: _get_numeric_prop_specs,
+    GObject.ParamSpecDouble: _get_numeric_prop_specs,
+}
 
 def get_available_gst_audio_sink_factories():
     factories = Gst.Registry.get().get_feature_list(Gst.ElementFactory)
@@ -52,44 +91,19 @@ def get_available_gst_factory_supported_properties(factory_name):
             continue
         properties[p.name] = p
     log.debug(f"available properties for gst audio sink {factory_name}:")
-    for p in properties:
-        log.debug(f"  {p}")
+    for p in list(properties):
+        prop_type_name = properties[p].g_type_instance.g_class.g_type.name
+        prop_pytype = properties[p].g_type_instance.g_class.g_type.pytype
+        if prop_pytype not in _supported_property_types:
+            log.debug(f"  (remove unhandled property {p} of type {prop_type_name})")
+            del properties[p]
+        else:
+            properties[p] = ( properties[p], _supported_property_types[prop_pytype](properties[p]) )
+            log.debug(f"  {p}: {prop_type_name} {properties[p][1]}")
     return properties
 
-def dump_gst_state(s):
-    return s.value_nick
-
-def dump_gst_seek_event(e):
-    return e.get_structure().to_string()
-
-def dump_gst_element(e):
-    return e.name
-
-def set_gst_state_blocking(element, gst_state):
-    log.debug(f"set_gst_state_blocking: element={dump_gst_element(element)} gst_state={dump_gst_state(gst_state)}")
-    r = element.set_state(gst_state)
-    if r == Gst.StateChangeReturn.ASYNC:
-        log.debug(f"wait for async completion")
-        retcode, gst_state, pending_gst_state = element.get_state(GST_BLOCKING_WAIT_TIMEOUT)
-        log.debug(f"end of wait for async completion. retcode={retcode} gst_state={dump_gst_state(gst_state)} pending_state={dump_gst_state(pending_gst_state)}")
-        if retcode == Gst.StateChangeReturn.FAILURE:
-            log.warning(f"gst async gst_state change failure on element {dump_gst_element(element)} after timeout of {GST_BLOCKING_WAIT_TIMEOUT / Gst.SECOND}ms")
-            log_callstack()
-        elif retcode == Gst.StateChangeReturn.ASYNC:
-            log.warning(f"gst async gst_state change on element {dump_gst_element(element)} still async after timeout of {GST_BLOCKING_WAIT_TIMEOUT / Gst.SECOND}ms")
-            log_callstack()
-        return retcode
-    return r
-
-def query_seek(element):
-    query = Gst.Query.new_seeking(Gst.Format.TIME)
-    query_retval = element.query(query)
-    if query_retval:
-        query_answer = query.parse_seeking()
-    else:
-        query_answer = None
-    log.debug(f"query seeking: success={query_retval}, answer={query_answer})")
-    return query_retval, query_answer
+# ------------------------------------------------------------------------
+# gst type system
 
 def cast_str_to_prop_pytype(prop, s):
     if prop.value_type.name == 'gchararray':
@@ -102,6 +116,52 @@ def cast_str_to_prop_pytype(prop, s):
         return float(s)
     else:
         return s
+
+# ------------------------------------------------------------------------
+# dumping functions for nice logs
+
+def dump_gst_state(s):
+    return s.value_nick
+
+def dump_gst_seek_event(e):
+    return e.get_structure().to_string()
+
+def dump_gst_element(e):
+    return e.name
+
+def dump_player_message(gst_message):
+    player_message, player_message_payload = extract_player_message(gst_message)
+    return f"{player_message.name}{player_message_payload}"
+
+def dump_gst_message(gst_message):
+    if gst_message.type == Gst.MessageType.APPLICATION:
+        msg_details_str = f"<{dump_player_message(gst_message)}>"
+    else:
+        msg_details_str = f"<{gst_message.get_structure().to_string() if gst_message.get_structure() else 'None'}>"
+    if gst_message.src == None:
+        src_str = ''
+    else:
+        src_str = f" src: {gst_message.src.get_name()}({gst_message.src.__class__.__name__})"
+    return f"gst message {gst_message.type.first_value_nick} [{gst_message.get_seqnum()}]: {msg_details_str}{src_str}"
+
+# ------------------------------------------------------------------------
+# deal with low level format of gst messages
+
+def extract_player_message_cb(field_name, value, payload_dict):
+    payload_dict[field_name.as_str()] = value
+
+def extract_player_message(gst_message):
+    if gst_message.type == Gst.MessageType.APPLICATION:
+        s = gst_message.get_structure()
+        player_message = PlayerMessages[s.get_name()]
+        player_message_payload = {}
+        s.foreach_id_str(extract_player_message_cb, player_message_payload)
+        return player_message, player_message_payload
+    else:
+        return None, None
+
+# ------------------------------------------------------------------------
+# dealing with tags
 
 def parse_tag_list(taglist):
     tmp = {}
@@ -146,24 +206,46 @@ def parse_tag_list(taglist):
         tmp = {}
     return containers
 
+# ------------------------------------------------------------------------
+# convenient function to get current seeking position
+
+def query_seek(element):
+    query = Gst.Query.new_seeking(Gst.Format.TIME)
+    query_retval = element.query(query)
+    if query_retval:
+        query_answer = query.parse_seeking()
+    else:
+        query_answer = None
+    log.debug(f"query seeking: success={query_retval}, answer={query_answer})")
+    return query_retval, query_answer
+
+# ------------------------------------------------------------------------
+# convert semitones to playback rate
+
+def get_semitone_ratio(semitones):
+    return pow(2, semitones/12.0)
+
+# ------------------------------------------------------------------------
+# the core sound player
+
 class SoundPlayer():
 
     def __init__(self):
-        # from lib.debug import debug_toggle_thread
-        # debug_toggle_thread()
-        self._player_state = PlayerStates.UNKNOWN
-        self._player_state_handler = self._unknown_state_transition_handler()
-        next(self._player_state_handler)
+        self._lock = threading.Lock()
         self._player_state_change_cv = threading.Condition()
-        self.gst_player = Gst.ElementFactory.make('playbin')
-        self.gst_player.set_property('flags', self.gst_player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)) # disable video, subtitles, visualisation
+        self.__change_player_state(PlayerStates.UNKNOWN)
+        self.gst_player = Gst.ElementFactory.make('playbin3')
         self.configure_audio_output()
         self.bus = self.gst_player.get_bus()
         self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
         self.playback_direction = PlaybackDirection.FORWARD
         self.semitone = 0
-        #self.post_player_message(PlayerMessages.ASK_PAUSE)
-        #time.sleep(1.0)
+        self.reset_seek = Gst.Event.new_seek(
+            self._playback_rate,
+            Gst.Format.TIME,
+            Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
+            Gst.SeekType.SET, 0,
+            Gst.SeekType.NONE, 0)
 
     def configure_audio_output(self):
         gst_sink_factory_name = config['gst_audio_sink']
@@ -188,10 +270,11 @@ class SoundPlayer():
             gst_sink_instance = Gst.ElementFactory.make(gst_sink_factory_name)
             for k, v in list(config['gst_audio_sink_properties'][gst_sink_factory_name].items()):
                 try:
-                    log.debug(f"gst sink '{gst_sink_factory_name}': set property '{k}' to value '{cast_str_to_prop_pytype(available_properties[k], v)}'")
-                    gst_sink_instance.set_property(k, cast_str_to_prop_pytype(available_properties[k], v))
+                    prop_val = cast_str_to_prop_pytype(available_properties[k][0], v)
+                    log.debug(f"gst sink '{gst_sink_factory_name}': set property '{k}' to value '{prop_val}'")
+                    gst_sink_instance.set_property(k, prop_val)
                 except:
-                    log.error(f"gst sink '{gst_sink_factory_name}': unable to set property '{k}' to value '{cast_str_to_prop_pytype(available_properties[k], v)}'")
+                    log.error(f"gst sink '{gst_sink_factory_name}': unable to set property '{k}' to value '{prop_val}'")
                     del config['gst_audio_sink_properties'][gst_sink_factory_name][k]
             try:
                 self.gst_player.set_property("audio-sink", gst_sink_instance)
@@ -204,14 +287,6 @@ class SoundPlayer():
             actual_gst_sink_factory_name = ''
             log.debug(f"gst playbin has no explcit sink set, will use the default sink")
         config['gst_audio_sink'] = actual_gst_sink_factory_name
-
-    def set_path(self, path):
-        uri = pathlib.Path(path).as_uri()
-        log.debug(f"set gst_player.uri to {uri}")
-        self.gst_player.set_state(Gst.State.NULL)
-        self.gst_player.set_property('uri', uri)
-        self.pause()
-        time.sleep(1)
 
     def get_duration_position(self):
         got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
@@ -226,344 +301,280 @@ class SoundPlayer():
     def semitone(self, value):
         self._semitone = value
         self._playback_rate = get_semitone_ratio(value) * self.playback_direction.value
-        got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        got_position, position = self.gst_player.query_position(Gst.Format.TIME)
-        if got_position:
-            if self._playback_rate > 0.0:
-                if got_seek_query_answer and seek_query_answer.seekable:
-                    self.gst_player.seek(
-                        self._playback_rate,
-                        Gst.Format.TIME,
-                        Gst.SeekFlags.FLUSH,
-                        Gst.SeekType.SET, position,
-                        Gst.SeekType.SET, seek_query_answer.segment_end)
-                else:
-                    self.gst_player.seek(
-                        self._playback_rate,
-                        Gst.Format.TIME,
-                        Gst.SeekFlags.FLUSH,
-                        Gst.SeekType.SET, position,
-                        Gst.SeekType.NONE, -1)
-            else:
-                if got_seek_query_answer and seek_query_answer.seekable:
-                    self.gst_player.seek(
-                        self._playback_rate,
-                        Gst.Format.TIME,
-                        Gst.SeekFlags.FLUSH,
-                        Gst.SeekType.SET, seek_query_answer.segment_start,
-                        Gst.SeekType.SET, position)
-                else:
-                    self.gst_player.seek(
-                        self._playback_rate,
-                        Gst.Format.TIME,
-                        Gst.SeekFlags.FLUSH,
-                        Gst.SeekType.NONE, -1,
-                        Gst.SeekType.NONE, position)
+        # got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
+        # got_position, position = self.gst_player.query_position(Gst.Format.TIME)
+        # if got_position:
+        #     if self._playback_rate > 0.0:
+        #         if got_seek_query_answer and seek_query_answer.seekable:
+        #             self.gst_player.seek(
+        #                 self._playback_rate,
+        #                 Gst.Format.TIME,
+        #                 Gst.SeekFlags.FLUSH,
+        #                 Gst.SeekType.SET, position,
+        #                 Gst.SeekType.SET, seek_query_answer.segment_end)
+        #         else:
+        #             self.gst_player.seek(
+        #                 self._playback_rate,
+        #                 Gst.Format.TIME,
+        #                 Gst.SeekFlags.FLUSH,
+        #                 Gst.SeekType.SET, position,
+        #                 Gst.SeekType.NONE, -1)
+        #     else:
+        #         if got_seek_query_answer and seek_query_answer.seekable:
+        #             self.gst_player.seek(
+        #                 self._playback_rate,
+        #                 Gst.Format.TIME,
+        #                 Gst.SeekFlags.FLUSH,
+        #                 Gst.SeekType.SET, seek_query_answer.segment_start,
+        #                 Gst.SeekType.SET, position)
+        #         else:
+        #             self.gst_player.seek(
+        #                 self._playback_rate,
+        #                 Gst.Format.TIME,
+        #                 Gst.SeekFlags.FLUSH,
+        #                 Gst.SeekType.NONE, -1,
+        #                 Gst.SeekType.NONE, position)
 
-    def dump_gst_message(self, message):
-        if message.type == Gst.MessageType.APPLICATION:
-            msg_details_str = f"<{PlayerMessages[message.get_structure().get_name()].name}>"
-        else:
-            msg_details_str = f"<{message.get_structure().to_string() if message.get_structure() else 'None'}>"
-        if message.src == None:
-            src_str = ''
-        else:
-            src_str = f" src: {message.src.get_name()}({message.src.__class__.__name__})"
-        return f"gst message {message.type.first_value_nick} [{message.get_seqnum()}]: {msg_details_str}{src_str}"
-
-    def log_gst_message(self, message):
-        if message.src == None:
+    def log_gst_message(self, gst_message):
+        if gst_message.src == None:
             colorfunc = brightmagenta
-        elif message.src == self.gst_player:
+        elif gst_message.src == self.gst_player:
             colorfunc = brightgreen
         else:
             colorfunc = cyan
-        log.debug(colorfunc(self.dump_gst_message(message)))
+        log.debug(colorfunc(dump_gst_message(gst_message)))
 
-    def post_player_message(self, player_message):
-        message_structure = Gst.Structure.new_empty(player_message.name)
-        message = Gst.Message.new_custom(
+    def post_player_message(self, player_message, **kwargs):
+        gst_message_structure = Gst.Structure.new_empty(player_message.name)
+        for kwarg in kwargs:
+            gst_message_structure.set_value(kwarg, kwargs[kwarg])
+        gst_message = Gst.Message.new_custom(
             Gst.MessageType.APPLICATION,
             None,
-            message_structure)
-        # mettre le self.bus.post(message) dans un with cond var pour qu'ensuite le wiat de la cond var on soit sur de voir passer le changement d'état
-        self.bus.post(message)
-
-    # def seek_blocking(self, seek_event):
-    #     ok = self.gst_player.send_event(seek_event)
-    #     # if not ok:
-    #     #     log.error(f"seek_blocking failed sending {seek_event}")
-    #     #     return
-    #     seek_seqnum = seek_event.get_seqnum()
-    #     log.debug(f"seek_event sequence number {seek_seqnum}")
-    #     seek_seqnum = seek_event.get_seqnum()
-    #     log.debug(f"seek_event sequence number {seek_seqnum}")
-    #     while True:
-    #         msg = self.bus.timed_pop(
-    #             GST_BLOCKING_WAIT_TIMEOUT)
-    #         # msg = self.bus.timed_pop_filtered(
-    #         #     GST_BLOCKING_WAIT_TIMEOUT,
-    #         #     Gst.MessageType.ASYNC_DONE | Gst.MessageType.ERROR)
-    #         if msg:
-    #             if msg.type == Gst.MessageType.ASYNC_DONE and msg.get_seqnum() == seek_seqnum:
-    #                 break
-    #             if msg.type == Gst.MessageType.ERROR:
-    #                 log.error(f"seek_blocking got error message {self.dump_gst_message(msg)}")
-    #             log.debug(f"discard message {self.dump_gst_message(msg)}")
-    #         else:
-    #             log.error(f"seek_blocking timeout")
-
-    # version initiale
-    # def log_state_machine_error(msg, player_message):
-    #     log.error(f"sound player state machine error: current_state={self._player_state} function={inspect.stack()[1][3]} msg={dump_gst_message(msg)} player_message={player_message}")
+            gst_message_structure)
+        # mettre le self.bus.post(message) dans un with cond var pour qu'ensuite le wait de la cond var on soit sur de voir passer le changement d'état
+        log.debug(f"sending player message {dump_player_message(gst_message)}")
+        self.bus.post(gst_message)
 
     def dump_state_machine_args(self, args):
-        return f"gst_msg={self.dump_gst_message(args.gst_msg)} player_msg={args.player_msg.name if args.player_msg else args.player_msg}"
+        return f"gst_msg={dump_gst_message(args.gst_msg)} player_msg={dump_player_message(args.player_msg) if args.player_msg else args.player_msg}"
 
-    # version coroutine
     def log_state_machine_error(self, args):
-        log.error(f"sound player state machine error: current_state={self._player_state} function={inspect.stack()[1][3]} {dump_state_machine_args(args)}")
+        log.error(f"sound player state machine error: current_state={self._player_state} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
+        log_callstack()
 
-    # def _async_gst_send_event(self, seek_event):
-    #     log.debug(f"_async_gst_send_event seek_event={seek_event}")
-    #     ok = self.gst_player.send_event(seek_event)
-    #     log.debug(f"_async_gst_send_event event sent")
-    #     if ok:
-    #         log.debug(f"_async_gst_send_event seek handled immediately")
-    #         self.post_player_message(PlayerMessages.SEEK_COMPLETE)
-    #     else:
-    #         log.debug(f"_async_gst_send_event seek will trigger ASYNC_DONE")
-    #     return False
-    
-    def _unknown_state_transition_handler(self):
-        args = yield None
-        while args.player_msg != PlayerMessages.ASK_PAUSE:
-            args = yield None
-        state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-        if state_change_retval == Gst.StateChangeReturn.FAILURE:
-            self.log_state_machine_error(args)
+    def _wait_state_change(self, state_change_retval, preroll_is_error=False):
+        if (state_change_retval == Gst.StateChangeReturn.FAILURE
+            or (preroll_is_error
+                and state_change_retval == Gst.StateChangeReturn.NO_PREROLL)):
+            log.warn(f"state change returned FAILURE")
+            yield PlayerStates.ERROR
         elif state_change_retval in [ Gst.StateChangeReturn.SUCCESS, Gst.StateChangeReturn.NO_PREROLL ]:
-            args = yield PlayerStates.PAUSED
+            log.debug(f"state change handled immediately")
         elif state_change_retval == Gst.StateChangeReturn.ASYNC:
+            log.debug(f"state change will trigger ASYNC_DONE, wait for it")
             args = yield None
             while args.gst_msg.type != Gst.MessageType.ASYNC_DONE:
                 args = yield None
-            args = yield PlayerStates.PAUSED
+
+    def _send_seek(self, seek):
+        log.debug(f"sending seek: {dump_gst_seek_event(seek)}")
+        ok = self.gst_player.send_event(seek)
+        if not ok:
+            log.warn(f"seek event send returned not ok")
+            yield PlayerStates.ERROR
+        if seek.get_structure().get_value('flags') & Gst.SeekFlags.FLUSH:
+            log.debug(f"flushing seek will trigger ASYNC_DONE, wait for it")
+            args = yield None
+            while args.gst_msg.type != Gst.MessageType.ASYNC_DONE:
+                args = yield None
+        else:
+            log.debug(f"seek is not flushing, do not wait for ASYNC_DONE")
+
+    def _set_uri(self, uri, next_state):
+        log.debug(f"set gst state to READY")
+        state_change_retval = self.gst_player.set_state(Gst.State.READY)
+        yield from self._wait_state_change(state_change_retval)
+        log.debug(f"set property uri of gst player to '{uri}'")
+        self.gst_player.set_property('uri', uri)
+        flags = self.gst_player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)
+        # disable video, subtitles, visualisation
+        log.debug(f"set flags of gst player to 0x{flags:08x}")
+        self.gst_player.set_property('flags',
+                                     flags)
+        log.debug(f"set gst state to PAUSED")
+        state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+        yield from self._wait_state_change(state_change_retval)
+        yield from self._send_seek(self.reset_seek)
+        yield next_state
+
+    def _unknown_state_transition_handler(self):
+        args = yield None
+        while args.player_msg != PlayerMessages.SET_URI:
+            args = yield None
+        yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.PAUSED)
 
     def _paused_state_transition_handler(self):
         args = yield None
-        while args.player_msg != PlayerMessages.ASK_PLAY:
+        while args.player_msg not in [ PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI ]:
             args = yield None
-        log.debug(f"set gst state to PAUSED")
-        state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-        if state_change_retval == Gst.StateChangeReturn.FAILURE:
-            log.debug(f"state change returned {state_change_retval}")
-            self.log_state_machine_error(args)
-        elif state_change_retval == Gst.StateChangeReturn.ASYNC:
-            log.debug(f"state change will trigger ASYNC_DONE, wait for it")
-            args = yield None
-            while args.gst_msg.type != Gst.MessageType.ASYNC_DONE:
-                args = yield None
-        got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        if got_seek_query_answer and seek_query_answer.seekable:
-            seek_event = Gst.Event.new_seek(
-                self._playback_rate,
-                Gst.Format.TIME,
-                Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                Gst.SeekType.SET, seek_query_answer.segment_start,
-                Gst.SeekType.SET, seek_query_answer.segment_end)
-        else:
-            seek_event = Gst.Event.new_seek(
-                self._playback_rate,
-                Gst.Format.TIME,
-                Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                Gst.SeekType.SET, 0,
-                Gst.SeekType.NONE, -1)
-        log.debug(f"sending seek event: {dump_gst_seek_event(seek_event)}")
-        ok = self.gst_player.send_event(seek_event)
-        log.debug(f"seek event sent")
-        if not ok:
-            log.debug(f"seek will trigger ASYNC_DONE, wait for it")
-            args = yield None
-            while args.gst_msg.type != Gst.MessageType.ASYNC_DONE:
-                args = yield None
-        else:
-            log.debug(f"seek handled immediately")
-        # #threading.Thread(target=self._async_gst_send_event, args=(seek_event,)).start()
-        # #GLib.idle_add(self._async_gst_send_event, seek_event)
-        # self._async_gst_send_event(seek_event)
-        # log.debug(f"after async seek")
-        # args = yield None
-        # while args.gst_msg.type != Gst.MessageType.ASYNC_DONE and args.player_msg != PlayerMessages.SEEK_COMPLETE:
-        #     log.debug("waiting")
-        #     args = yield None
-        # log.debug("seek complete")
-        # if not seek_retval:
-        #     args = yield None
-        #     while args.gst_msg.type != Gst.MessageType.ASYNC_DONE:
-        #         args = yield None
 
-        # # log.warning("before sleep")
-        # # time.sleep(0.1)
-        # # log.warning("after sleep")
-        log.debug(f"set gst state to PLAYING")
-        state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
-        if state_change_retval in [ Gst.StateChangeReturn.FAILURE, Gst.StateChangeReturn.NO_PREROLL ]:
-            log.debug(f"state change returned {state_change_retval}")
-            self.log_state_machine_error(args)
-        elif state_change_retval == Gst.StateChangeReturn.SUCCESS:
-            log.debug(f"state change handled immediately")
-            args = yield PlayerStates.PLAYING
-        elif state_change_retval == Gst.StateChangeReturn.ASYNC:
-            log.debug(f"state change will trigger ASYNC_DONE, wait for it")
-            args = yield None
-            while args.gst_msg.type != Gst.MessageType.ASYNC_DONE:
-                args = yield None
-            args = yield PlayerStates.PLAYING
+        if args.player_msg == PlayerMessages.SET_URI:
+            yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.PAUSED)
+        else:
+            # set to pause before seeking/playing.
+            # This part of code causes no issue (checked with pulse, openal, pipewire)
+            log.debug(f"set gst state to PAUSED")
+            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+            yield from self._wait_state_change(state_change_retval)
+
+            # This part of code causes no issue (checked with pulse, openal, pipewire)
+            # got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
+
+            # This part of code causes no issue (checked with pulse, openal, pipewire)
+            # if got_seek_query_answer and seek_query_answer.seekable:
+            # if False:
+            #     seek_event = Gst.Event.new_seek(
+            #         self._playback_rate,
+            #         Gst.Format.TIME,
+            #         Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+            #         Gst.SeekType.SET, seek_query_answer.segment_start,
+            #         Gst.SeekType.SET, seek_query_answer.segment_end)
+            # else:
+            #     seek_event = Gst.Event.new_seek(
+            #         self._playback_rate,
+            #         Gst.Format.TIME,
+            #         Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+            #         Gst.SeekType.SET, 0,
+            #         Gst.SeekType.NONE, -1)
+
+            # PROBLEM IS HERE
+            # avec openal et pipewire: ne recevra jamais le EOS
+            # avec pulse: reçoit le EOS mais pas de son
+            # si j'envoie le myseek alloué dans la main thread il reçoit un segment done
+            # si j'envoie le seek alloué ici il reçoit jamais ni segment done ni eos
+
+            yield from self._send_seek(self.reset_seek)
+
+            log.debug(f"set gst state to PLAYING")
+            state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
+            yield from self._wait_state_change(state_change_retval, preroll_is_error=True)
+            yield PlayerStates.PLAYING
 
     def _playing_state_transition_handler(self):
         args = yield None
-        
-        # chaque fois que je change d'état je dois instancier un
-        # nouveau générateur qui va être la logique de cet état
-        
-        # en fait non la coroutine est la logique de changement
-        # d'état. En fait soit j'embarque une logique "compliquée" de
-        # changement d'état dans les coroutines, soit de crée des
-        # états distincts explicites pour cette logique
-        
-        # exemple: si on est en état PAUSE, recevoir ASK_PLAY doit
-        # d'abord faire une gst pause, attendre le ASYNC_DONE, puis
-        # faire un gst seek, attendre le ASYNC_DONE, puis
-        # éventuellement faire un autre gst seek, attendre le
-        # ASYNC_DONE, puis faire un gst play, attendre le ASYNC_DONE
-        # et ensuite seulement on est dans l'état play. Et cette
-        # transition vers l'état play devrait alors générer une
-        # condition ou gérer un sémaphore
-        
-    # def _unknown_transition(self, msg, player_message):
-    #     if player_message == PlayerMessages.ASK_PAUSE:
-    #         self.gst_player.set_state(Gst.State.PAUSED)
-    #     elif msg.type == Gst.MessageType.ASYNC_DONE:
-    #         return PlayerStates.PAUSED
-    #     else:
-    #         self.log_state_machine_error(msg, player_message)
-    #     return PlayerStates.UNKNOWN
+        if args.gst_msg.type == Gst.MessageType.SEGMENT_DONE:
+            log.debug(f"set gst state to PAUSED")
+            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+            yield from self._wait_state_change(state_change_retval)
+            yield from self._send_seek(self.reset_seek)
+            yield PlayerStates.PAUSED
+        elif args.gst_msg.type == Gst.MessageType.EOS:
+            log.debug(f"set gst state to PAUSED")
+            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+            yield from self._wait_state_change(state_change_retval)
+            yield from self._send_seek(self.reset_seek)
+            yield PlayerStates.PAUSED
+        elif args.player_msg == PlayerMessages.ASK_PAUSE:
+            log.debug(f"set gst state to PAUSED")
+            state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
+            yield from self._wait_state_change(state_change_retval)
+            yield from self._send_seek(self.reset_seek)
+            yield PlayerStates.PAUSED
 
-    # def _paused_transition(self, msg, player_message):
-    #     if player_message == PlayerMessages.ASK_PLAY:
-    #         new_player_state = PlayerStates.PAUSED_SEEKING
-    #     elif player_message == PlayerMessages.ASK_PLAY:
-    #         pass
-    #     return new_player_state
+    def _error_state_transition_handler(self):
+        while True:
+            args = yield None
 
-    # # def _paused_seeking_transition(self, msg, player_message):
-    # #     return None
-
-    # def _playing_transition(self, msg, player_message):
-    #     new_player_state = PlayerStates.PAUSED
-    #     return new_player_state
-
-    # def _playing_seeking_transition(self, msg, player_message):
-    #     pass
-
-    # version coroutines
     _msg_player_state_handlers = {
         PlayerStates.UNKNOWN: (
-            (
-                Gst.MessageType.APPLICATION,
-                Gst.MessageType.ASYNC_DONE
-            ),
+            {
+                Gst.MessageType.APPLICATION: ( PlayerMessages.SET_URI, ),
+                Gst.MessageType.ASYNC_DONE: None,
+            },
             _unknown_state_transition_handler
         ),
         PlayerStates.PAUSED: (
-            (
-                Gst.MessageType.APPLICATION,
-                Gst.MessageType.ASYNC_DONE
-            ),
+            {
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI,),
+                Gst.MessageType.ASYNC_DONE: None,
+            },
             _paused_state_transition_handler
         ),
         PlayerStates.PLAYING: (
-            (),
+            {
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PAUSE, ),
+                Gst.MessageType.ASYNC_DONE: None,
+                Gst.MessageType.EOS: None,
+                Gst.MessageType.SEGMENT_DONE: None,
+            },
             _playing_state_transition_handler
-        )
+        ),
+        PlayerStates.ERROR: (
+            {},
+            _error_state_transition_handler
+        ),
     }
 
-    # # version initiale
-    # _msg_player_state_funcs = {
-    #     Gst.MessageType.APPLICATION: {
-    #         PlayerStates.UNKNOWN: _unknown_transition,
-    #         PlayerStates.PAUSED: _paused_transition,
-    #         # PlayerStates.PAUSED_SEEKING: _paused_seeking_transition,
-    #         PlayerStates.PLAYING: _playing_transition,
-    #         # PlayerStates.PLAYING_SEEKING: _playing_seeking_transition,
-    #     },
-    #     Gst.MessageType.ASYNC_DONE: {
-    #         PlayerStates.UNKNOWN: _unknown_transition,
-    #         # PlayerStates.PAUSED: _paused_transition,
-    #         # PlayerStates.PAUSED_SEEKING: _paused_seeking_transition,
-    #         PlayerStates.PLAYING: _playing_transition,
-    #         # PlayerStates.PLAYING_SEEKING: _playing_seeking_transition,
-    #     },
-    #     Gst.MessageType.SEGMENT_DONE: {
-    #     },
-    #     Gst.MessageType.EOS: {
-    #     },
-    # }
-
-    def wait_player_state(self, player_state):
-        while self._player_state != player_state:
+    def wait_player_state(self, player_states):
+        while self._player_state not in player_states:
             with self._player_state_change_cv:
                 self._player_state_change_cv.wait()
+                # est-ce que je met le whith CV autour du while ou à l'intérieur du while?
                 # que se passe t-il si par exemple le state passe de
                 # paused à paused_seeking, mais que le seeking va
                 # tellement vite qu'il repasse immédiatement à paused
                 # avant que le wait_player_state soit appelé?
+                # ou alors ne pas attendre l'état du player et juste
+                # envoyer des events. Mais je risque d'envoyer le seek
+                # avant la completion d'autre chose
+                # ou alors j'envoie juste un event play et c'est dans
+                # le message handler que j'implémente toute la
+                # mécanique
 
-                # ou alors ne pas attendre l'état du player et juste envoyer des events. Mais je risque d'envoyer le seek avant la completion d'autre chose
+    def __change_player_state(self, new_state):
+        with self._player_state_change_cv:
+            self._player_state = new_state
+            self._player_state_handler = SoundPlayer._msg_player_state_handlers[self._player_state][1](self)
+            next(self._player_state_handler)
+            log.debug(brightcyan(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}"))
+            self._player_state_change_cv.notify()
 
-                # ou alors j'envoie juste un event play et c'est dans le message handler que j'implémente toute la mécanique
-            
     def _gst_bus_message_handler(self, bus, message, *user_data):
-        self.log_gst_message(message)
-        # version coroutines
-        if message.src == self.gst_player or message.src == None:
-            if message.type in SoundPlayer._msg_player_state_handlers[self._player_state][0]:
-                log.debug(brightmagenta(f"player state {self._player_state.name} received {self.dump_gst_message(message)}"))
-                if message.type == Gst.MessageType.APPLICATION:
-                    player_message = PlayerMessages[message.get_structure().get_name()]
-                else:
-                    player_message = None
+        if LOG_ALL_GST_MESSAGES:
+            self.log_gst_message(message)
+        if message.type == Gst.MessageType.WARNING:
+            log.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
+        elif message.type == Gst.MessageType.ERROR:
+            log.warning(f"Gstreamer ERROR: {message.type}: {message.get_structure().to_string()}")
+        elif message.type == Gst.MessageType.TAG:
+            message_struct = message.get_structure()
+            taglist = message.parse_tag()
+            metadata = parse_tag_list(taglist)
+            # self.current_sound_playing.update_metadata(metadata)
+            # self.update_metadata_to_current_playing_message.emit()
+        elif message.src == self.gst_player or message.src == None:
+            current_state_handles_this_message = False
+            player_message = None
+            if message.type != Gst.MessageType.APPLICATION:
+                if message.type in SoundPlayer._msg_player_state_handlers[self._player_state][0]:
+                    current_state_handles_this_message = True
+            else:
+                player_message, player_message_args = extract_player_message(message)
+                if player_message in SoundPlayer._msg_player_state_handlers[self._player_state][0][Gst.MessageType.APPLICATION]:
+                    current_state_handles_this_message = True
+            if current_state_handles_this_message:
+                log.debug(brightmagenta(f"player state {self._player_state.name} received {dump_gst_message(message)}"))
                 new_player_state = self._player_state_handler.send(types.SimpleNamespace(gst_msg=message, player_msg=player_message))
-                if new_player_state != None and self._player_state != new_player_state:
-                    with self._player_state_change_cv:
-                        self._player_state = new_player_state
-                        self._player_state_handler = SoundPlayer._msg_player_state_handlers[self._player_state][1](self)
-                        next(self._player_state_handler)
-                        log.debug(brightcyan(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}"))
-                        self._player_state_change_cv.notify()
+                if new_player_state != None:
+                    log.debug(brightmagenta(f"player state change from {self._player_state} to {new_player_state}"))
+                    self.__change_player_state(new_player_state)
                 else:
                     log.debug(brightmagenta(f"player state stays {self._player_state}"))
+            # else:
+            #     log.debug(f"player state {self._player_state.name} ignores {dump_gst_message(message)}")
         return True
-        
-        # # version initiale
-        # if message.src == self.gst_player or message.src == None:
-        #     if message.type in SoundPlayer._msg_player_state_funcs:
-        #         if self._player_state in SoundPlayer._msg_player_state_funcs[message.type]:
-        #             log.debug(brightmagenta(f"player state {self._player_state.name} received {self.dump_gst_message(message)}"))
-        #             if message.type == Gst.MessageType.APPLICATION:
-        #                 player_message = PlayerMessages[message.get_structure().get_name()]
-        #             else:
-        #                 player_message = None
-        #             new_player_state = SoundPlayer._msg_player_state_funcs[message.type][self._player_state](self, message, player_message)
-        #             if self._player_state != new_player_state:
-        #                 with self._player_state_change_cv:
-        #                     self._player_state = new_player_state
-        #                     log.debug(brightcyan(f"player state changed to {self._player_state}"))
-        #                     self._player_state_change_cv.notify()
-        #             else:
-        #                 log.debug(brightmagenta(f"player state stays {self._player_state}"))
-                    
+
         # if message.type == Gst.MessageType.SEGMENT_DONE:
         #     self.log_gst_message(message)
         #     if config['play_looped']:
@@ -629,86 +640,27 @@ class SoundPlayer():
         #     self.log_gst_message(message)
         return True
 
-    # def seek2(self, seek_event):
-    #     self.post_player_message(PlayerMessages.ASK_SEEK)
-    #     # prbolème: ce n'est pas modélisable par un état
-    #     # si état unkown reçoit ça -> erreur
-    #     # si état paused reçoit ça -> attendre un async done
-    #     # mais si état paused reçoit un async done suite à un play -> comment distinguer?
-    #     # même question pouir étét playing qui reçoit async_done
-    #     # conclusion: les états doivent avoir un état, par exemple qu'est-ce que l'état est en train de faire
-    #     # si combionaison incorrecte: erreur
-
+    def set_path(self, path):
+        with self._lock:
+            uri = pathlib.Path(path).as_uri()
+            self.post_player_message(PlayerMessages.SET_URI, uri=uri)
+            self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
+            if SLEEP_HACK_TIME > 0:
+                time.sleep(SLEEP_HACK_TIME)
 
     def play(self, from_position=None):
-        self.post_player_message(PlayerMessages.ASK_PLAY)
-        self.wait_player_state(PlayerStates.PLAYING)
-        # time.sleep(5.0)
-        # seek_event = Gst.Event.new_seek(
-        #     self._playback_rate,
-        #     Gst.Format.TIME,
-        #     Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #     Gst.SeekType.SET, 0,
-        #     Gst.SeekType.NONE, -1)
-        # log.debug(f"before async seek seek_event={seek_event}")
-        # #threading.Thread(target=self._async_gst_send_event, args=(seek_event,)).start()
-        # GLib.timeout_add(2000, self._async_gst_send_event, seek_event)
-        # log.debug(f"after async seek")
-
-        # return
-        # log.debug(f"gst play from_position={from_position}")
-        # self.post_player_message(PlayerMessages.ASK_PAUSE)
-        # self.wait_player_state(PlayerStates.PAUSED)
-        # #set_gst_state_blocking(self.gst_player, Gst.State.PAUSED)
-        # got_seek_query_answer, seek_query_answer = query_seek(self.gst_player)
-        # if got_seek_query_answer and seek_query_answer.seekable:
-        #     # seek_event = Gst.Event.new_seek(
-        #     #     self._playback_rate,
-        #     #     Gst.Format.TIME,
-        #     #     Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #     #     Gst.SeekType.SET, seek_query_answer.segment_start,
-        #     #     Gst.SeekType.SET, seek_query_answer.segment_end)
-        #     # self.post_player_message(PlayerMessages.ASK_SEEK, seek_event)
-        #     # self.seek_blocking(Gst.Event.new_seek(
-        #     #     self._playback_rate,
-        #     #     Gst.Format.TIME,
-        #     #     Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #     #     Gst.SeekType.SET, seek_query_answer.segment_start,
-        #     #     Gst.SeekType.SET, seek_query_answer.segment_end))
-        #     self.gst_player.seek(
-        #         self._playback_rate,
-        #         Gst.Format.TIME,
-        #         Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #         Gst.SeekType.SET, seek_query_answer.segment_start,
-        #         Gst.SeekType.SET, seek_query_answer.segment_end)
-        # else:
-        #     # self.seek_blocking(Gst.Event.new_seek(
-        #     #     self._playback_rate,
-        #     #     Gst.Format.TIME,
-        #     #     Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #     #     Gst.SeekType.SET, 0,
-        #     #     Gst.SeekType.NONE, -1))
-        #     self.gst_player.seek(
-        #         self._playback_rate,
-        #         Gst.Format.TIME,
-        #         Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #         Gst.SeekType.SET, 0,
-        #         Gst.SeekType.NONE, -1)
-        # if from_position != None:
-        #     self.seek(from_position)
-        # import time
-        # log.debug("before sleep")
-        # time.sleep(0.1)
-        # log.debug("after sleep")
-        # self.gst_player.set_state(Gst.State.PLAYING)
+        with self._lock:
+            self.post_player_message(PlayerMessages.ASK_PLAY)
+            self.wait_player_state((PlayerStates.PLAYING, PlayerStates.ERROR))
+            if SLEEP_HACK_TIME > 0:
+                time.sleep(SLEEP_HACK_TIME)
 
     def pause(self):
-        self.post_player_message(PlayerMessages.ASK_PAUSE)
-        self.wait_player_state(PlayerStates.PAUSED)
-
-    # def pause(self):
-    #     log.debug(f"gst pause")
-    #     self.gst_player.set_state(Gst.State.PAUSED)
+        with self._lock:
+            self.post_player_message(PlayerMessages.ASK_PAUSE)
+            self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
+            if SLEEP_HACK_TIME > 0:
+                time.sleep(SLEEP_HACK_TIME)
 
     def stop(self):
         log.debug(f"gst stop")
