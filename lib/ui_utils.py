@@ -1,4 +1,49 @@
-from PySide2 import QtCore, QtGui
+import os
+from lib.config import config
+from PySide2 import QtCore, QtGui, QtWidgets
+
+class SbQFileSystemModel(QtWidgets.QFileSystemModel):
+
+    def __init__(self, show_hidden_files, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self.show_hidden_files = show_hidden_files
+
+    def hasChildren(self, parent):
+        if self.flags(parent) & QtCore.Qt.ItemNeverHasChildren:
+            return False
+        try:
+            with os.scandir(self.filePath(parent)) as it:
+                for entry in it:
+                    if (not entry.name.startswith('.') or self.show_hidden_files) and entry.is_dir():
+                        return True
+        except PermissionError:
+            return False
+        return False
+
+class SbQSortFilterProxyModel(QtCore.QSortFilterProxyModel):
+
+    def lessThan(self, left, right):
+        if left.column() not in [ 0, 2 ] or right.column() not in [ 0, 2 ]:
+            return super().lessThan(left, right)
+        info_left = self.sourceModel().fileInfo(left)
+        info_right =  self.sourceModel().fileInfo(right)
+        if info_left.isDir() and info_right.isFile():
+            return True
+        elif info_left.isFile() and info_right.isDir():
+            return False
+        return super().lessThan(left, right)
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        first_col_index = self.sourceModel().index(source_row, 0, source_parent);
+        file_info = self.sourceModel().fileInfo(first_col_index)
+        if file_info.isDir():
+            return super().filterAcceptsRow(source_row, source_parent)
+        filename = self.sourceModel().fileName(first_col_index)
+        remaining, sep, ext = filename.rpartition('.')
+        if not config['filter_files']: return True
+        if not sep: return False
+        if ext.lower() in [ e.lower() for e in config['file_extensions_filter'] ]: return True
+        return False
 
 def set_pixmap(qlabel, qpixmap):
     w = qlabel.width()

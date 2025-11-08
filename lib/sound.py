@@ -216,22 +216,23 @@ class SoundPlayer():
     def __init__(self):
         self._lock = threading.Lock()
         self._player_state_change_cv = threading.Condition()
-        self.__change_player_state(PlayerStates.UNKNOWN)
         self.metadata_callback = None
+        self.state_change_callback = None
+        self.__change_player_state(PlayerStates.UNKNOWN)
         self.gst_player = Gst.ElementFactory.make('playbin3')
         self.bus = self.gst_player.get_bus()
         self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
-        self.playback_direction = PlaybackDirection.FORWARD
-        self.semitone = 0
+        self._semitone = 0
+        self._direction = PlaybackDirection.FORWARD
         self.reset_seek = Gst.Event.new_seek(
-            self._playback_rate,
+            self.playback_rate,
             Gst.Format.TIME,
             Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
             Gst.SeekType.SET, 0,
             Gst.SeekType.NONE, 0)
 
     # ------------------------------------------------------------------------
-    # metadata
+    # callbacks
 
     def notify_metadata(self, metadata):
         if self.metadata_callback:
@@ -239,6 +240,13 @@ class SoundPlayer():
 
     def set_metadata_callback(self, cb):
         self.metadata_callback = cb
+
+    def notify_state_change(self, state):
+        if self.state_change_callback:
+            self.state_change_callback(state)
+
+    def set_state_change_callback(self, cb):
+        self.state_change_callback = cb
 
     # ------------------------------------------------------------------------
     # output sink config
@@ -295,7 +303,18 @@ class SoundPlayer():
     @semitone.setter
     def semitone(self, value):
         self._semitone = value
-        self._playback_rate = get_semitone_ratio(value) * self.playback_direction.value
+
+    @property
+    def direction(self):
+        return self._direction
+
+    @direction.setter
+    def direction(self, direction):
+        self._direction = direction
+
+    @property
+    def playback_rate(self):
+        return get_semitone_ratio(self.semitone) * self.direction.value
 
     # ------------------------------------------------------------------------
     # gst messages / player messages utils
@@ -482,6 +501,7 @@ class SoundPlayer():
             next(self._player_state_handler)
             log.debug(brightcyan(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}"))
             self._player_state_change_cv.notify()
+        self.notify_state_change(new_state)
 
     # ------------------------------------------------------------------------
     # gst bus handler
@@ -536,7 +556,7 @@ class SoundPlayer():
 
     def play(self, from_position=None):
         with self._lock:
-            self.post_player_message(PlayerMessages.ASK_PLAY)
+            self.post_player_message(PlayerMessages.ASK_PLAY, position=from_position)
             self.wait_player_state((PlayerStates.PLAYING, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
