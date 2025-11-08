@@ -24,7 +24,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
 import argparse, os.path
-from lib.logger import init_logger
+from lib.logger import init_logger, log
 from lib.config import load_conf
 from lib.sound import init_sound
 #from lib.ui import start_ui
@@ -48,16 +48,18 @@ if __name__ == '__main__':
     mainloop = GLib.MainLoop()
     threading.Thread(target=mainloop.run).start()
     player = SoundPlayer()
-    player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum.wav")
+    audio_output_config = player.configure_audio_output('', None)
+    log.debug(f"sound output config: {audio_output_config}")
+    #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum.wav")
     #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum_reverb.wav")
-    #player.set_path("/home/mimbert/music/staging/tracks-mixing/01 01A1 Untitled.mp3")
+    player.set_path("/home/mimbert/music/staging/albums/R. Kelly - Double Up/08 I'm a Flirt (remix).mp3")
     import time
     #time.sleep(0.1)
     while True:
         player.play()
-        time.sleep(1)
-        # player.pause()
-        # time.sleep(10)
+        time.sleep(2)
+        player.stop()
+        time.sleep(2)
 
         #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum.wav")
         #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum_reverb.wav")

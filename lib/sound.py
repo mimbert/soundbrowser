@@ -1,14 +1,13 @@
 import os, os.path, re, pathlib, enum, threading, time, inspect, types
 from lib.utils import LRU, format_duration
 from lib.logger import log, cyan, brightgreen, brightmagenta, brightcyan, log_callstack
-from lib.config import config
 from gi.repository import GObject, Gst, GLib
 from PySide2 import QtCore
 
 CACHE_SIZE = 256
+LOG_ALL_GST_MESSAGES = True
 SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't
                     # do correctly (especially with pipewiresink)
-LOG_ALL_GST_MESSAGES = True
 
 class PlayerStates(enum.Enum):
     UNKNOWN = 0
@@ -17,11 +16,10 @@ class PlayerStates(enum.Enum):
     ERROR = 4
 
 class PlayerMessages(enum.Enum):
-    ASK_PAUSE = 0
-    ASK_SEEK = 1
-    ASK_PLAY = 2
-    SEEK_COMPLETE = 3
-    SET_URI = 4
+    SET_URI = 0
+    ASK_STOP = 1
+    ASK_PAUSE = 2
+    ASK_PLAY = 3
 
 class PlaybackDirection(enum.Enum):
     FORWARD = 1
@@ -103,10 +101,7 @@ def get_available_gst_factory_supported_properties(factory_name):
             log.debug(f"  {p}: {prop_type_name} {properties[p][1]}")
     return properties
 
-# ------------------------------------------------------------------------
-# gst type system
-
-def cast_str_to_prop_pytype(prop, s):
+def _cast_str_to_prop_pytype(prop, s):
     if prop.value_type.name == 'gchararray':
         return s
     elif prop.value_type.name == 'gboolean':
@@ -222,8 +217,8 @@ class SoundPlayer():
         self._lock = threading.Lock()
         self._player_state_change_cv = threading.Condition()
         self.__change_player_state(PlayerStates.UNKNOWN)
+        self.metadata_callback = None
         self.gst_player = Gst.ElementFactory.make('playbin3')
-        self.configure_audio_output()
         self.bus = self.gst_player.get_bus()
         self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
         self.playback_direction = PlaybackDirection.FORWARD
@@ -236,11 +231,21 @@ class SoundPlayer():
             Gst.SeekType.NONE, 0)
 
     # ------------------------------------------------------------------------
+    # metadata
+
+    def notify_metadata(self, metadata):
+        if self.metadata_callback:
+            self.metadata_callback(metadata)
+
+    def set_metadata_callback(self, cb):
+        self.metadata_callback = cb
+
+    # ------------------------------------------------------------------------
     # output sink config
 
-    def configure_audio_output(self):
-        # TODO: don't access config struct directly (for sink properties)
-        gst_sink_factory_name = config['gst_audio_sink']
+    def configure_audio_output(self, gst_sink_factory_name, gst_sink_properties):
+        if not gst_sink_properties:
+            gst_sink_properties = {}
         available_gst_audio_sink_factories = get_available_gst_audio_sink_factories()
         if gst_sink_factory_name:
             log.debug(f"check if gst sink '{gst_sink_factory_name}' available")
@@ -250,35 +255,35 @@ class SoundPlayer():
             else:
                 log.debug(f"gst sink '{gst_sink_factory_name}' is available")
         if gst_sink_factory_name:
-            if gst_sink_factory_name not in config['gst_audio_sink_properties']:
-                config['gst_audio_sink_properties'][gst_sink_factory_name] = {}
             available_properties = get_available_gst_factory_supported_properties(gst_sink_factory_name)
-            for config_prop in list(config['gst_audio_sink_properties'][gst_sink_factory_name].keys()):
-                log.debug(f"check if property '{config_prop}' (from config) is available for gst sink '{gst_sink_factory_name}'")
-                if config_prop not in available_properties:
-                    log.info(f"unavailable property '{config_prop}' for gst sink '{gst_sink_factory_name}', removing it from config")
-                    del config['gst_audio_sink_properties'][gst_sink_factory_name][config_prop]
+            for prop in list(gst_sink_properties.keys()):
+                log.debug(f"check if property '{prop}' is available for gst sink '{gst_sink_factory_name}'")
+                if prop not in available_properties:
+                    log.info(f"unavailable property '{prop}' for gst sink '{gst_sink_factory_name}'")
+                    del gst_sink_properties[prop]
             log.debug(f"instanciate gst sink '{gst_sink_factory_name}'")
             gst_sink_instance = Gst.ElementFactory.make(gst_sink_factory_name)
-            for k, v in list(config['gst_audio_sink_properties'][gst_sink_factory_name].items()):
+            for k, v in list(gst_sink_properties.items()):
                 try:
-                    prop_val = cast_str_to_prop_pytype(available_properties[k][0], v)
+                    prop_val = _cast_str_to_prop_pytype(available_properties[k][0], v)
                     log.debug(f"gst sink '{gst_sink_factory_name}': set property '{k}' to value '{prop_val}'")
                     gst_sink_instance.set_property(k, prop_val)
                 except:
                     log.error(f"gst sink '{gst_sink_factory_name}': unable to set property '{k}' to value '{prop_val}'")
-                    del config['gst_audio_sink_properties'][gst_sink_factory_name][k]
+                    del gst_sink_properties[k]
             try:
                 self.gst_player.set_property("audio-sink", gst_sink_instance)
                 log.debug(f"gst playbin: set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
             except:
                 log.error(f"gst playbin: unable to set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
+                return False, gst_sink_factory_name, gst_sink_properties
         if self.gst_player.get_property('audio-sink') and self.gst_player.get_property('audio-sink').get_factory():
             actual_gst_sink_factory_name = self.gst_player.get_property('audio-sink').get_factory().name
+            return True, actual_gst_sink_factory_name, gst_sink_properties
         else:
             actual_gst_sink_factory_name = ''
-            log.debug(f"gst playbin has no explcit sink set, will use the default sink")
-        config['gst_audio_sink'] = actual_gst_sink_factory_name
+            log.debug(f"gst playbin has no explicit sink set, will use the default sink")
+            return True, actual_gst_sink_factory_name, {}
 
     # ------------------------------------------------------------------------
     # playback rate
@@ -382,11 +387,11 @@ class SoundPlayer():
             args = yield None
         if args.player_msg == PlayerMessages.SET_URI:
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.PAUSED)
-        else:
+        elif args.player_msg == PlayerMessages.ASK_PLAY:
             log.debug(f"set gst state to PAUSED")
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_gst_state_change(state_change_retval)
-            yield from self._send_seek(self.reset_seek)
+            #yield from self._send_seek(self.reset_seek)
             log.debug(f"set gst state to PLAYING")
             state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
             yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
@@ -395,14 +400,16 @@ class SoundPlayer():
     def _playing_state_transition_handler(self):
         args = yield None
         while not ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
-                    or args.player_msg == PlayerMessages.ASK_PAUSE ):
+                    or args.player_msg in [ PlayerMessages.ASK_PAUSE, PlayerMessages.ASK_STOP ] ):
             args = yield None
         log.debug(f"set gst state to PAUSED")
         state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
         yield from self._wait_gst_state_change(state_change_retval)
-        log.debug(f"set gst state to READY")
-        state_change_retval = self.gst_player.set_state(Gst.State.READY)
-        yield from self._wait_gst_state_change(state_change_retval)
+        if ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
+             or args.player_msg == PlayerMessages.ASK_STOP ):
+            log.debug(f"set gst state to READY")
+            state_change_retval = self.gst_player.set_state(Gst.State.READY)
+            yield from self._wait_gst_state_change(state_change_retval)
         yield PlayerStates.PAUSED
 
     def _error_state_transition_handler(self):
@@ -422,14 +429,14 @@ class SoundPlayer():
         ),
         PlayerStates.PAUSED: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI,),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, ),
                 Gst.MessageType.ASYNC_DONE: None,
             },
             _paused_state_transition_handler
         ),
         PlayerStates.PLAYING: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PAUSE, ),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PAUSE, PlayerMessages.ASK_STOP, ),
                 Gst.MessageType.ASYNC_DONE: None,
                 Gst.MessageType.EOS: None,
                 Gst.MessageType.SEGMENT_DONE: None,
@@ -490,8 +497,7 @@ class SoundPlayer():
             message_struct = message.get_structure()
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
-            # self.current_sound_playing.update_metadata(metadata)
-            # self.update_metadata_to_current_playing_message.emit()
+            self.notify_metadata(metadata)
         elif message.src == self.gst_player or message.src == None:
             current_state_handles_this_message = False
             player_message = None
@@ -538,6 +544,13 @@ class SoundPlayer():
     def pause(self):
         with self._lock:
             self.post_player_message(PlayerMessages.ASK_PAUSE)
+            self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
+            if SLEEP_HACK_TIME > 0:
+                time.sleep(SLEEP_HACK_TIME)
+
+    def stop(self):
+        with self._lock:
+            self.post_player_message(PlayerMessages.ASK_STOP)
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
