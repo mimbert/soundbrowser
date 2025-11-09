@@ -20,7 +20,7 @@
 
 import os
 from lib.config import config
-from PySide2 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 class SbQFileSystemModel(QtWidgets.QFileSystemModel):
 

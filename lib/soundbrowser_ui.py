@@ -24,7 +24,7 @@ from lib.utils import split_path_filename, format_duration
 from lib.sound_player import SoundPlayer, PlayerStates
 from lib.sound_manager import SoundManager
 from lib.logger import log, brightcyan, warmred
-from PySide2 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
 from lib.ui_utils import set_pixmap, set_dark_theme, SbQFileSystemModel, SbQSortFilterProxyModel
 from lib.prefsdialog_ui import PrefsDialog
@@ -247,24 +247,24 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if config['treeview_state']:
             self.restore_treeview_state(config['treeview_state'])
         self.tableView_contextMenu = QtWidgets.QMenu(self.tableView)
-        reload_sound_action = QtWidgets.QAction("Reload", self.tableView)
+        reload_sound_action = QtGui.QAction("Reload", self.tableView)
         self.tableView_contextMenu.addAction(reload_sound_action)
         reload_sound_action.triggered.connect(self.reload_sound)
-        tableView_return_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Return), self.tableView)
-        tableView_enter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Enter), self.tableView)
+        tableView_return_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Return), self.tableView)
+        tableView_enter_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Enter), self.tableView)
         tableView_return_shortcut.setContext(QtCore.Qt.WidgetShortcut)
         tableView_enter_shortcut.setContext(QtCore.Qt.WidgetShortcut)
         tableView_return_shortcut.activated.connect(self.tableView_return_pressed)
         tableView_enter_shortcut.activated.connect(self.tableView_return_pressed)
-        loop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_L), self)
-        metadata_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_M), self)
-        hidden_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_H), self)
-        filter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F), self)
-        play_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space), self)
-        stop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
-        reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_R), self)
-        scrollto_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F5), self)
-        help_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F1), self)
+        loop_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_L), self)
+        metadata_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_M), self)
+        hidden_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_H), self)
+        filter_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F), self)
+        play_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space), self)
+        stop_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
+        reset_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.Key_R), self)
+        scrollto_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F5), self)
+        help_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F1), self)
         loop_shortcut.activated.connect(self.loop_shortcut_activated)
         metadata_shortcut.activated.connect(self.metadata_shortcut_activated)
         hidden_shortcut.activated.connect(self.hidden_shortcut_activated)
@@ -274,9 +274,9 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         reset_shortcut.activated.connect(self.reset_shortcut_activated)
         scrollto_shortcut.activated.connect(self.scrollto)
         help_shortcut.activated.connect(self.show_help)
-        self.copy_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Copy), self)
+        self.copy_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Copy), self)
         self.copy_shortcut.activated.connect(self.mainwin_copy)
-        self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
+        self.paste_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
         self.paste_shortcut.activated.connect(self.mainwin_paste)
         self.tune_value.setFixedWidth(self.tune_value.height())
         self.tune_value.setFixedHeight(self.tune_value.height())
@@ -370,7 +370,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             getattr(self, field).setText(default_val)
             getattr(self, field).setEnabled(False)
             getattr(self, field + '_label').setEnabled(False)
-        self.image.setPixmap(None)
+        self.image.clear()
 
     def update_metadata_pane(self, metadata):
         m = metadata['all']
@@ -394,7 +394,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if m.get('image'):
             set_pixmap(self.image, m.get('image'))
         else:
-            self.image.setPixmap(None)
+            self.image.clear()
 
     @QtCore.Slot()
     def prefs_button_clicked(self, checked = False):

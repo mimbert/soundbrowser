@@ -19,7 +19,7 @@
 # SOFTWARE.
 
 import signal, sys, enum
-from PySide2 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
 from lib.soundbrowser_ui import SoundBrowserUI
 
 def start_ui(startup_path):

@@ -19,7 +19,7 @@
 # SOFTWARE.
 
 import copy
-from PySide2 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from lib.config import config, STARTUP_PATH_MODE_SPECIFIED_PATH, STARTUP_PATH_MODE_LAST_PATH
 from lib.ui_utils import set_dark_theme
 from lib.sound_player import get_available_gst_audio_sink_factories, get_available_gst_factory_supported_properties
@@ -41,10 +41,10 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         self.setMinimumSize(self.size())
         self.setMaximumSize(self.size())
         self.update_audio_sink_properties.connect(self.fill_audio_sink_properties, QtCore.Qt.QueuedConnection)
-        audio_sink_properties_del_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete), self.audio_output_properties)
+        audio_sink_properties_del_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete), self.audio_output_properties)
         audio_sink_properties_del_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
         audio_sink_properties_del_shortcut.activated.connect(self.audio_sink_prop_del)
-        audio_sink_properties_backspace_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Backspace), self.audio_output_properties)
+        audio_sink_properties_backspace_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Backspace), self.audio_output_properties)
         audio_sink_properties_backspace_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
         audio_sink_properties_backspace_shortcut.activated.connect(self.audio_sink_prop_del)
 
