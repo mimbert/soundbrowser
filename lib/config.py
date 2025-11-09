@@ -7,6 +7,7 @@ STARTUP_PATH_MODE_CURRENT_DIR = 3
 STARTUP_PATH_MODE_HOME_DIR = 4
 
 config = {}
+_config_path = None
 
 conf_schema = schema.Schema({
     schema.Optional('startup_path_mode', default=STARTUP_PATH_MODE_HOME_DIR): int,
@@ -31,28 +32,26 @@ conf_schema = schema.Schema({
     schema.Optional('dark_theme', default=False): bool,
 })
 
-def load_conf(path=None):
-    if path:
-        log.debug(f"loading conf from {path}")
-        try:
-            with open(path) as fh:
-                conf = yaml.safe_load(fh)
-        except OSError:
-            log.debug(f"error reading conf from {path}, using an empty conf")
-            conf = {}
-    else:
-        log.debug(f"init a default conf")
-        conf = {}
+def load_conf(path):
     global config
+    global _config_path
+    _config_path = path
+    log.debug(f"loading conf from {_config_path}")
+    try:
+        with open(_config_path) as fh:
+            tmp_conf = yaml.safe_load(fh)
+    except OSError:
+        log.debug(f"error reading conf from {_config_path}, using an empty conf")
+        tmp_conf = {}
     config.clear()
-    config.update(conf_schema.validate(conf))
+    config.update(conf_schema.validate(tmp_conf))
 
-def save_conf(path):
+def save_conf():
     global config
     config = conf_schema.validate(config)
-    log.debug(f"saving conf to {path}")
+    log.debug(f"saving conf to {_config_path}")
     try:
-        with open(path, 'w') as fh:
+        with open(_config_path, 'w') as fh:
             yaml.dump(config, fh)
     except OSError:
-        log.debug(f"unable to save conf to {path}")
+        log.debug(f"unable to save conf to {_config_path}")

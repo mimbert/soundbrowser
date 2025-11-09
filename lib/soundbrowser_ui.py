@@ -68,7 +68,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         config['splitter_state'] = self.splitter.saveState().data()
         if config['startup_path_mode'] == STARTUP_PATH_MODE_LAST_PATH:
             config['last_path'] = self.tableview_get_path(self.tableView.currentIndex())
-        save_conf(self.conf_file)
+        save_conf()
 
     def closeEvent(self, event):
         self.clean_close()
