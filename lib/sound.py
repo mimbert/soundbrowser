@@ -1,4 +1,4 @@
-import os, os.path, re, pathlib, enum, threading, time, inspect, types
+import os, os.path, re, pathlib, enum, threading, time, inspect, types, contextlib
 from lib.utils import LRU, format_duration
 from lib.logger import log, cyan, brightgreen, brightmagenta, brightcyan, log_callstack
 from gi.repository import GObject, Gst, GLib
@@ -216,6 +216,7 @@ class SoundPlayer():
     def __init__(self):
         self._lock = threading.Lock()
         self._player_state_change_cv = threading.Condition()
+        self._bus_wath_thread = None
         self.metadata_callback = None
         self.state_change_callback = None
         self.__change_player_state(PlayerStates.UNKNOWN)
@@ -479,20 +480,22 @@ class SoundPlayer():
         log_callstack()
 
     def wait_player_state(self, player_states):
-        while self._player_state not in player_states:
-            with self._player_state_change_cv:
-                self._player_state_change_cv.wait()
-                # est-ce que je met le whith CV autour du while ou à l'intérieur du while?
-                # que se passe t-il si par exemple le state passe de
-                # paused à paused_seeking, mais que le seeking va
-                # tellement vite qu'il repasse immédiatement à paused
-                # avant que le wait_player_state soit appelé?
-                # ou alors ne pas attendre l'état du player et juste
-                # envoyer des events. Mais je risque d'envoyer le seek
-                # avant la completion d'autre chose
-                # ou alors j'envoie juste un event play et c'est dans
-                # le message handler que j'implémente toute la
-                # mécanique
+        if threading.current_thread() != self._bus_wath_thread and self._bus_wath_thread != None:
+            while self._player_state not in player_states:
+                with self._player_state_change_cv:
+                    self._player_state_change_cv.wait()
+                    # est-ce que je met le whith CV autour du while ou
+                    # à l'intérieur du while?  que se passe t-il si
+                    # par exemple le state passe de paused à
+                    # paused_seeking, mais que le seeking va tellement
+                    # vite qu'il repasse immédiatement à paused avant
+                    # que le wait_player_state soit appelé?  ou alors
+                    # ne pas attendre l'état du player et juste
+                    # envoyer des events. Mais je risque d'envoyer le
+                    # seek avant la completion d'autre chose ou alors
+                    # j'envoie juste un event play et c'est dans le
+                    # message handler que j'implémente toute la
+                    # mécanique
 
     def __change_player_state(self, new_state):
         with self._player_state_change_cv:
@@ -507,6 +510,8 @@ class SoundPlayer():
     # gst bus handler
 
     def _gst_bus_message_handler(self, bus, message, *user_data):
+        if not self._bus_wath_thread:
+            self._bus_wath_thread = threading.current_thread()
         if LOG_ALL_GST_MESSAGES:
             self.log_gst_message(message)
         if message.type == Gst.MessageType.WARNING:
@@ -517,6 +522,7 @@ class SoundPlayer():
             message_struct = message.get_structure()
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
+            log.warn(f"tag: {metadata}")
             self.notify_metadata(metadata)
         elif message.src == self.gst_player or message.src == None:
             current_state_handles_this_message = False
@@ -546,30 +552,36 @@ class SoundPlayer():
     # ------------------------------------------------------------------------
     # public interface
 
+    def _get_state_change_lock(self):
+        if threading.current_thread() == self._bus_wath_thread or self._bus_wath_thread == None:
+            return contextlib.nullcontext()
+        else:
+            return self._lock
+
     def set_path(self, path):
-        with self._lock:
+        with self._get_state_change_lock():
             uri = pathlib.Path(path).as_uri()
             self.post_player_message(PlayerMessages.SET_URI, uri=uri)
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
-    def play(self, from_position=None):
-        with self._lock:
+    def play(self, from_position=0):
+        with self._get_state_change_lock():
             self.post_player_message(PlayerMessages.ASK_PLAY, position=from_position)
             self.wait_player_state((PlayerStates.PLAYING, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
     def pause(self):
-        with self._lock:
+        with self._get_state_change_lock():
             self.post_player_message(PlayerMessages.ASK_PAUSE)
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
     def stop(self):
-        with self._lock:
+        with self._get_state_change_lock():
             self.post_player_message(PlayerMessages.ASK_STOP)
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
