@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from PySide2 import QtWidgets
+from PySide6 import QtWidgets
 from lib.ui_lib import help_dial
 
 class HelpDialog(help_dial.Ui_HelpDialog, QtWidgets.QDialog):
