@@ -31,14 +31,27 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.in_keyboard_press_event = False
         self.manager = SoundManager()
         self.player = SoundPlayer()
-        # todo configure sound output of player
-        # todo register callbacks to player
+        audio_config_success, gst_audio_sink, gst_audio_sink_properties = self.player.configure_audio_output(
+            config['gst_audio_sink'],
+            config['gst_audio_sink_properties'][config['gst_audio_sink']])
+        if audio_config_success:
+            log.debug(f"successfuly configured gst_audio_sink={gst_audio_sink} properties={gst_audio_sink_properties}")
+            config['gst_audio_sink'] = gst_audio_sink
+            config['gst_audio_sink_properties'][config['gst_audio_sink']] = gst_audio_sink_properties
+        else:
+            log.warn(f"failed configuring gst_audio_sink={config['gst_audio_sink']} properties={config['gst_audio_sink_properties'][config['gst_audio_sink']]}")
+        self.player.set_metadata_callback(self.update_metadata)
+        self.player.set_state_change_callback(None)
         self.setupUi(self)
         self.populate(startup_path)
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
         self.seek_next_value = None
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
+
+    def update_metadata(self, metadata):
+        self.current_sound_playing.update_metadata(metadata)
+        self.update_metadata_to_current_playing_message.emit()
 
     def __str__(self):
         return f"SoundBrowserUI <state={self.state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
@@ -512,6 +525,9 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def reverse_shortcut_activated(self):
         self.reverse_button.click()
 
+    # ------------------------------------------------------------------------
+    # sound position update
+
     @QtCore.Slot()
     def seek_position_updater(self):
         duration, position = self.player.get_duration_position()
@@ -535,40 +551,32 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         log.debug(f"disable seek pos updates")
         self.seek_pos_update_timer.stop()
 
-    def play(self, start_pos=None):
+    @QtCore.Slot()
+    def seek_min_interval_timer_fired(self):
+        if self.seek_next_value:
+            self.actual_seek(self.seek_next_value)
+        self.seek_next_value = None
+        self.seek_min_interval_timer = None
+
+    # ------------------------------------------------------------------------
+    # play / pause / stop
+
+    def play(self, start_pos=0):
         log.debug(f"play {self}")
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             log.error(f"play called with no sound selected nor playing")
             return
-        if self.state == SoundState.PLAYING:
+        if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
+            self.player.stop()
             self.state = SoundState.STOPPED
-            self.player.set_state(Gst.State.PAUSED)
-        if self.state == SoundState.STOPPED:
-            if self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
-                self.player.set_path(self.current_sound_selected.path)
-                self.current_sound_playing = sound
-            elif self.current_sound_playing.file_changed():
-                self.player.set_path(self.current_sound_playing.path)
-                self.current_sound_playing = sound
-            set_state_blocking(self.player, Gst.State.PAUSED)
-            got_seek_query_answer, seek_query_answer = query_seek(self.player)
-            if got_seek_query_answer and seek_query_answer.seekable:
-                self.player.seek(self.playback_rate,
-                                 Gst.Format.TIME,
-                                 Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                                 Gst.SeekType.SET, seek_query_answer.segment_start,
-                                 Gst.SeekType.SET, seek_query_answer.segment_end)
-        else:
-            self.player.seek(self.playback_rate,
-                             Gst.Format.TIME,
-                             Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                             Gst.SeekType.SET, 0,
-                             Gst.SeekType.NONE, -1)
-        if start_pos != None:
-            self.actual_seek(start_pos)
-        self.player.set_state(Gst.State.PLAYING)
+        if self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
+            self.player.set_path(self.current_sound_selected.path)
+            self.current_sound_playing = self.current_sound_selected
+        elif self.current_sound_playing.file_changed():
+            self.player.set_path(self.current_sound_playing.path)
+        self.player.play(start_pos)
         self.state = SoundState.PLAYING
-        self.enable_seek_pos_updates()
+        #self.enable_seek_pos_updates()
 
     def pause(self):
         log.debug(f"pause {self}")
@@ -578,46 +586,27 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if not self.current_sound_playing:
             log.error(f"pause called with current_sound_playing = {self.current_sound_playing}")
             return
-        self.player.set_state(Gst.State.PAUSED)
+        self.player.pause()
         self.state = SoundState.PAUSED
-        self.disable_seek_pos_updates()
+        #self.disable_seek_pos_updates()
 
     def stop(self):
         log.debug(f"stop {self}")
-        self.player.set_state(Gst.State.PAUSED)
-        got_seek_query_answer, seek_query_answer = query_seek(self.player)
-        if got_seek_query_answer and seek_query_answer.seekable:
-            self.player.seek(self.playback_rate,
-                             Gst.Format.TIME,
-                             Gst.SeekFlags.FLUSH,
-                             Gst.SeekType.SET, seek_query_answer.segment_start,
-                             Gst.SeekType.SET, seek_query_answer.segment_end)
-        else:
-            self.player.seek(self.playback_rate,
-                             Gst.Format.TIME,
-                             Gst.SeekFlags.FLUSH,
-                             Gst.SeekType.SET, 0,
-                             Gst.SeekType.NONE, -1)
+        self.player.stop()
         self.state = SoundState.STOPPED
-        self.disable_seek_pos_updates()
+        #self.disable_seek_pos_updates()
         self._current_sound_playing = None
         self.seek_slider.setValue(0.0)
 
-    def seek(self, position):
-        if self.seek_min_interval_timer != None:
-            log.debug(f"seek to {position} delayed to limit gst seek events frequency")
-            self.seek_next_value = position
-        else:
-            self.actual_seek(position)
-            self.seek_next_value = None
-            self.seek_min_interval_timer = QtCore.QTimer()
-            self.seek_min_interval_timer.setSingleShot(True)
-            self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
-            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
+    # def seek(self, position):
+    #     if self.seek_min_interval_timer != None:
+    #         log.debug(f"seek to {position} delayed to limit gst seek events frequency")
+    #         self.seek_next_value = position
+    #     else:
+    #         self.actual_seek(position)
+    #         self.seek_next_value = None
+    #         self.seek_min_interval_timer = QtCore.QTimer()
+    #         self.seek_min_interval_timer.setSingleShot(True)
+    #         self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
+    #         self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
 
-    @QtCore.Slot()
-    def seek_min_interval_timer_fired(self):
-        if self.seek_next_value:
-            self.actual_seek(self.seek_next_value)
-        self.seek_next_value = None
-        self.seek_min_interval_timer = None

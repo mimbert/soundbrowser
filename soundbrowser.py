@@ -58,7 +58,7 @@ if __name__ == '__main__':
     # while True:
     #     player.play()
     #     time.sleep(2)
-    #     player.stop()
+    #     player.pause()
     #     time.sleep(2)
 
     #     #player.set_path("/home/mimbert/devel/soundbrowser.git/bass_drum.wav")
