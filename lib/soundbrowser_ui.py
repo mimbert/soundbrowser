@@ -1,7 +1,7 @@
 import os, os.path, enum
 from lib.config import config, save_conf, STARTUP_PATH_MODE_SPECIFIED_PATH, STARTUP_PATH_MODE_LAST_PATH
 from lib.utils import split_path_filename, format_duration
-from lib.sound import SoundManager, SoundPlayer, PlaybackDirection
+from lib.sound import SoundManager, SoundPlayer, PlayerStates, PlaybackDirection
 from lib.logger import log
 from PySide2 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
@@ -41,7 +41,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             log.warn(f"failed configuring gst_audio_sink={config['gst_audio_sink']} properties={config['gst_audio_sink_properties'][config['gst_audio_sink']]}")
         self.player.set_metadata_callback(self.update_metadata)
-        self.player.set_state_change_callback(None)
+        self.player.set_state_change_callback(self.sound_player_state_changed)
         self.setupUi(self)
         self.populate(startup_path)
         self.seek_pos_update_timer = QtCore.QTimer()
@@ -52,6 +52,23 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def update_metadata(self, metadata):
         self.current_sound_playing.update_metadata(metadata)
         self.update_metadata_to_current_playing_message.emit()
+
+    def sound_player_state_changed(self, state):
+        if state in [ PlayerStates.UNKNOWN, PlayerStates.PAUSED, PlayerStates.ERROR ]:
+            log.warn(f"player state: {state} notify_sound_stopped")
+            # pb: comment savoir si on va vers paused ou stopped il
+            # faudrait que j'ai un notify_sound_playing() et
+            # notify_sound_paused(), et éventuellement que tout soit
+            # fait en asynchrone, c'est à dire que ces notifications
+            # soient faites uniquement via les changements d'état du
+            # player (pas depuis les fonctions play pause stop) pour
+            # cela comment distiunguer paused de stopped? via la cause
+            # du state change? en ajoutant un état STOPPED au player?
+            self.state = SoundState.STOPPED
+            self.notify_sound_stopped()
+        else:
+            self.state = SoundState.PLAYING
+            log.warn(f"player state: {state} DO NOTHING")
 
     def __str__(self):
         return f"SoundBrowserUI <state={self.state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
@@ -576,7 +593,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.player.set_path(self.current_sound_playing.path)
         self.player.play(start_pos)
         self.state = SoundState.PLAYING
-        #self.enable_seek_pos_updates()
+        self.enable_seek_pos_updates()
 
     def pause(self):
         log.debug(f"pause {self}")
@@ -588,13 +605,13 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             return
         self.player.pause()
         self.state = SoundState.PAUSED
-        #self.disable_seek_pos_updates()
+        self.disable_seek_pos_updates()
 
     def stop(self):
         log.debug(f"stop {self}")
         self.player.stop()
         self.state = SoundState.STOPPED
-        #self.disable_seek_pos_updates()
+        self.disable_seek_pos_updates()
         self._current_sound_playing = None
         self.seek_slider.setValue(0.0)
 

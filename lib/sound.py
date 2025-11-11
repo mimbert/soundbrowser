@@ -594,6 +594,27 @@ class SoundPlayer():
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
+    def is_seekable(self):
+        query = Gst.Query.new_seeking(Gst.Format.TIME)
+        query_retval = self.gst_player.query(query)
+        if query_retval:
+            return query.parse_seeking().seekable
+        else:
+            return False
+
+    def get_duration_position(self):
+        got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
+        got_position, position = self.gst_player.query_position(Gst.Format.TIME)
+        if got_duration:
+            tv1 = duration
+        else:
+            tv1 = None
+        if got_position:
+            tv2 = position
+        else:
+            tv2 = None
+        return (tv1, tv2)
+
 class Sound():
 
     def __init__(self, path, stat_result):
