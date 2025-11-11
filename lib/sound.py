@@ -2,7 +2,7 @@ import os, os.path, re, pathlib, enum, threading, time, inspect, types, contextl
 from lib.utils import LRU, format_duration
 from lib.logger import log, cyan, brightgreen, brightmagenta, brightcyan, log_callstack
 from gi.repository import GObject, Gst, GLib
-from PySide2 import QtCore
+from PySide2 import QtCore, QtGui
 
 CACHE_SIZE = 256
 LOG_ALL_GST_MESSAGES = True
@@ -163,40 +163,48 @@ def parse_tag_list(taglist):
     tmp = {}
     containers = {}
     for i in range(taglist.n_tags()):
-        tag = taglist.nth_tag_name(i)
-        value = None
-        if tag in [ 'title', 'artist', 'album', 'genre', 'musical-key', 'album-artist', 'encoder', 'channel-mode', 'audio-codec', 'container-format', 'comment' ]:
-            value = taglist.get_string(tag)
-        elif tag in [ 'track-count', 'track-number', 'minimum-bitrate', 'maximum-bitrate', 'bitrate' ]:
-            value = taglist.get_uint(tag)
-        elif tag == 'duration':
-            value = taglist.get_uint64(tag)
-        elif tag in [  'beats-per-minute', 'replaygain-track-gain', 'replaygain-album-gain', 'replaygain-track-peak', 'replaygain-album-peak' ]:
-            value = taglist.get_double(tag)
-        elif tag == 'datetime':
-            value = taglist.get_date_time(tag)
-            if value[0]:
-                value = (True, value[1].to_iso8601_string())
+        tag_name = taglist.nth_tag_name(i)
+        value_tuple = None
+        if tag_name in [ 'title', 'artist', 'album', 'genre', 'musical-key', 'album-artist', 'encoder', 'channel-mode', 'audio-codec', 'container-format', 'comment' ]:
+            value_tuple = taglist.get_string(tag_name)
+        elif tag_name in [ 'track-count', 'track-number', 'minimum-bitrate', 'maximum-bitrate', 'bitrate' ]:
+            value_tuple = taglist.get_uint(tag_name)
+        elif tag_name == 'duration':
+            value_tuple = taglist.get_uint64(tag_name)
+        elif tag_name in [  'beats-per-minute', 'replaygain-track-gain', 'replaygain-album-gain', 'replaygain-track-peak', 'replaygain-album-peak' ]:
+            value_tuple = taglist.get_double(tag_name)
+        elif tag_name == 'datetime':
+            value_tuple = taglist.get_date_time(tag_name)
+            if value_tuple[0]:
+                value_tuple = (True, value_tuple[1].to_iso8601_string())
             else:
-                value = taglist.get_date(tag)
-                if value[0]:
-                    value = (True, value[1].to_struct_tm()) # never tested, need to find an example stream
-        elif tag == 'has-crc':
-            value = taglist.get_boolean(tag)
-        elif tag == 'image':
-            value = taglist.get_sample(tag)
-            memmap = value[1].get_buffer().get_all_memory().map(Gst.MapFlags.READ)
-            bytearr = QtCore.QByteArray(memmap.data.tobytes())
-            img = QtGui.QImage()
-            img.loadFromData(bytearr)
-            img = QtGui.QPixmap(img)
-            value = (True, img)
-        if value and value[0]:
-            if tag == 'container-format':
-                containers[value[1]] = tmp
+                value_tuple = taglist.get_date(tag_name)
+                if value_tuple[0]:
+                    value_tuple = (True, value_tuple[1].to_struct_tm()) # never tested, need to find an example stream
+        elif tag_name == 'has-crc':
+            value_tuple = taglist.get_boolean(tag_name)
+        elif tag_name == 'image':
+            sample_ok, sample = taglist.get_sample(tag_name)
+            if sample_ok:
+                gst_mem = sample.get_buffer().get_all_memory()
+                map_ok, map_info = gst_mem.map(Gst.MapFlags.READ)
+                if map_ok:
+                    map_data = map_info.data
+                    img = QtGui.QImage()
+                    img.loadFromData(map_data)
+                    img = QtGui.QPixmap(img)
+                    value_tuple = (True, img)
+                    gst_mem.unmap(map_info)
+                else:
+                    log.warn(f"unsuccessful map gst_memory={gst_mem} tag={i}/{tag_name} of {taglist}")
+            else:
+                log.warn(f"unsuccessful get_sample_index tag={i}/{tag_name} of {taglist}")
+        if value_tuple and value_tuple[0]:
+            if tag_name == 'container-format':
+                containers[value_tuple[1]] = tmp
                 tmp = {}
             else:
-                tmp[tag] = value[1]
+                tmp[tag_name] = value_tuple[1]
     if len(tmp) > 0:
         containers[None] = tmp
         tmp = {}
@@ -220,7 +228,7 @@ class SoundPlayer():
         self.metadata_callback = None
         self.state_change_callback = None
         self.__change_player_state(PlayerStates.UNKNOWN)
-        self.gst_player = Gst.ElementFactory.make('playbin3')
+        self.gst_player = Gst.ElementFactory.make('playbin')
         self.bus = self.gst_player.get_bus()
         self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
         self._semitone = 0
@@ -522,7 +530,6 @@ class SoundPlayer():
             message_struct = message.get_structure()
             taglist = message.parse_tag()
             metadata = parse_tag_list(taglist)
-            log.warn(f"tag: {metadata}")
             self.notify_metadata(metadata)
         elif message.src == self.gst_player or message.src == None:
             current_state_handles_this_message = False
