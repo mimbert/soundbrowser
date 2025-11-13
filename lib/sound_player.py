@@ -511,7 +511,6 @@ class SoundPlayer():
             self._player_state = new_state
             self._player_state_handler = SoundPlayer._msg_player_state_handlers[self._player_state][1](self)
             next(self._player_state_handler)
-            log.debug(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}")
             self._player_state_change_cv.notify()
         self.notify_state_change(new_state)
 
@@ -554,7 +553,7 @@ class SoundPlayer():
                     log.debug(brightgreen(f"player state change from {self._player_state} to {new_player_state}"))
                     self.__change_player_state(new_player_state)
                 else:
-                    log.debug(brightmagenta(f"player state stays {self._player_state}"))
+                    log.debug(brightgreen(f"player state stays {self._player_state}"))
         return True
 
     # ------------------------------------------------------------------------
