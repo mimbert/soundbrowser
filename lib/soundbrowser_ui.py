@@ -55,7 +55,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def sound_player_state_changed(self, state):
         if state in [ PlayerStates.UNKNOWN, PlayerStates.PAUSED, PlayerStates.ERROR ]:
-            log.warn(f"player state: {state} notify_sound_stopped")
             # pb: comment savoir si on va vers paused ou stopped il
             # faudrait que j'ai un notify_sound_playing() et
             # notify_sound_paused(), et éventuellement que tout soit
@@ -68,7 +67,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.notify_sound_stopped()
         else:
             self.state = SoundState.PLAYING
-            log.warn(f"player state: {state} DO NOTHING")
 
     def __str__(self):
         return f"SoundBrowserUI <state={self.state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"

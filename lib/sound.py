@@ -1,19 +1,19 @@
 import os, os.path, re, pathlib, enum, threading, time, inspect, types, contextlib
 from lib.utils import LRU, format_duration
-from lib.logger import log, cyan, brightgreen, brightmagenta, brightcyan, log_callstack
+from lib.logger import log, lightcyan, lightgreen, brightmagenta, brightgreen, log_callstack
 from gi.repository import GObject, Gst, GLib
-from PySide2 import QtCore, QtGui
+from PySide2 import QtGui
 
 CACHE_SIZE = 256
-LOG_ALL_GST_MESSAGES = True
 SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't
                     # do correctly (especially with pipewiresink)
 
 class PlayerStates(enum.Enum):
     UNKNOWN = 0
-    PAUSED = 1
+    ERROR = 1
+    STOPPED = 2
     PLAYING = 3
-    ERROR = 4
+    PAUSED = 4
 
 class PlayerMessages(enum.Enum):
     SET_URI = 0
@@ -332,9 +332,9 @@ class SoundPlayer():
         if gst_message.src == None:
             colorfunc = brightmagenta
         elif gst_message.src == self.gst_player:
-            colorfunc = brightgreen
+            colorfunc = lightgreen
         else:
-            colorfunc = cyan
+            colorfunc = lightcyan
         log.debug(colorfunc(dump_gst_message(gst_message)))
 
     def post_player_message(self, player_message, **kwargs):
@@ -407,14 +407,14 @@ class SoundPlayer():
         args = yield None
         while args.player_msg != PlayerMessages.SET_URI:
             args = yield None
-        yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.PAUSED)
+        yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
 
-    def _paused_state_transition_handler(self):
+    def _stopped_state_transition_handler(self):
         args = yield None
         while args.player_msg not in [ PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI ]:
             args = yield None
         if args.player_msg == PlayerMessages.SET_URI:
-            yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.PAUSED)
+            yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
         elif args.player_msg == PlayerMessages.ASK_PLAY:
             log.debug(f"set gst state to PAUSED")
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
@@ -438,7 +438,9 @@ class SoundPlayer():
             log.debug(f"set gst state to READY")
             state_change_retval = self.gst_player.set_state(Gst.State.READY)
             yield from self._wait_gst_state_change(state_change_retval)
-        yield PlayerStates.PAUSED
+            yield PlayerStates.STOPPED
+        else:
+            yield PlayerStates.PAUSED
 
     def _error_state_transition_handler(self):
         while True:
@@ -455,12 +457,19 @@ class SoundPlayer():
             },
             _unknown_state_transition_handler
         ),
+        PlayerStates.STOPPED: (
+            {
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, ),
+                Gst.MessageType.ASYNC_DONE: None,
+            },
+            _stopped_state_transition_handler
+        ),
         PlayerStates.PAUSED: (
             {
                 Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, ),
                 Gst.MessageType.ASYNC_DONE: None,
             },
-            _paused_state_transition_handler
+            _stopped_state_transition_handler
         ),
         PlayerStates.PLAYING: (
             {
@@ -510,7 +519,7 @@ class SoundPlayer():
             self._player_state = new_state
             self._player_state_handler = SoundPlayer._msg_player_state_handlers[self._player_state][1](self)
             next(self._player_state_handler)
-            log.debug(brightcyan(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}"))
+            log.debug(f"player state changed to {self._player_state}, state_handler is now {self._player_state_handler}")
             self._player_state_change_cv.notify()
         self.notify_state_change(new_state)
 
@@ -520,7 +529,7 @@ class SoundPlayer():
     def _gst_bus_message_handler(self, bus, message, *user_data):
         if not self._bus_wath_thread:
             self._bus_wath_thread = threading.current_thread()
-        if LOG_ALL_GST_MESSAGES:
+        if log.log_all_gst_messages:
             self.log_gst_message(message)
         if message.type == Gst.MessageType.WARNING:
             log.warning(f"Gstreamer WARNING: {message.type}: {message.get_structure().to_string()}")
@@ -550,7 +559,7 @@ class SoundPlayer():
                     # change, which instanciate a new "state
                     # transition" generator and will notify the state
                     # change cond var
-                    log.debug(brightmagenta(f"player state change from {self._player_state} to {new_player_state}"))
+                    log.debug(brightgreen(f"player state change from {self._player_state} to {new_player_state}"))
                     self.__change_player_state(new_player_state)
                 else:
                     log.debug(brightmagenta(f"player state stays {self._player_state}"))
@@ -569,7 +578,7 @@ class SoundPlayer():
         with self._get_state_change_lock():
             uri = pathlib.Path(path).as_uri()
             self.post_player_message(PlayerMessages.SET_URI, uri=uri)
-            self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
+            self.wait_player_state((PlayerStates.STOPPED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
@@ -590,7 +599,7 @@ class SoundPlayer():
     def stop(self):
         with self._get_state_change_lock():
             self.post_player_message(PlayerMessages.ASK_STOP)
-            self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
+            self.wait_player_state((PlayerStates.STOPPED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
