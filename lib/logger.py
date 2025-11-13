@@ -12,6 +12,9 @@ def lightcyan(s):
 def lightgreen(s):
     return '\033[0;2;92m' + s + '\033[0m'
 
+def lightblue(s):
+    return '\033[0;0;34m' + s + '\033[0m'
+
 def brightmagenta(s):
     return '\033[0;1;95m' + s + '\033[0m'
 

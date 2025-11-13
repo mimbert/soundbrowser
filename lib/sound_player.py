@@ -1,5 +1,5 @@
 import re, pathlib, enum, threading, time, inspect, types, contextlib
-from lib.logger import log, lightcyan, lightgreen, brightmagenta, brightgreen, log_callstack
+from lib.logger import log, lightcyan, lightgreen, brightmagenta, brightgreen, lightblue, log_callstack
 from gi.repository import GObject, Gst, GLib
 
 SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't
@@ -326,9 +326,9 @@ class SoundPlayer():
 
     def log_gst_message(self, gst_message):
         if gst_message.src == None:
-            colorfunc = brightmagenta
+            colorfunc = lightblue
         elif gst_message.src == self.gst_player:
-            colorfunc = lightgreen
+            colorfunc = lightblue
         else:
             colorfunc = lightcyan
         log.debug(colorfunc(dump_gst_message(gst_message)))
