@@ -11,10 +11,10 @@ clean:
 	rm -rf lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
 	find . -type d -name __pycache__ -exec rm -rf {} +
 
-dist: all
+dist: clean all
 	rsync -am --delete --include='*.py' --include='*.png' --exclude='build/' --include='*/' --exclude='*' . build/
 	mv build/soundbrowser.py build/__main__.py
-	cd build && zip -r ../soundbrowser.zip *
+	cd build && zip -0r ../soundbrowser.zip *
 	echo '#!/usr/bin/env python3' | cat - soundbrowser.zip > soundbrowser
 	rm soundbrowser.zip
 	chmod a+x soundbrowser
