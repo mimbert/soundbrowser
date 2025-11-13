@@ -2,7 +2,7 @@ import copy
 from PySide2 import QtCore, QtGui, QtWidgets
 from lib.config import config, STARTUP_PATH_MODE_SPECIFIED_PATH, STARTUP_PATH_MODE_LAST_PATH
 from lib.ui_utils import set_dark_theme
-from lib.sound import get_available_gst_audio_sink_factories, get_available_gst_factory_supported_properties
+from lib.sound_player import get_available_gst_audio_sink_factories, get_available_gst_factory_supported_properties
 from lib.ui_lib import prefs_dial
 
 DEFAULT_SINK_DISPLAY_NAME = '(default)'

@@ -26,7 +26,7 @@ gi.require_version('Gst', '1.0')
 import argparse, os.path
 from lib.logger import init_logger, log
 from lib.config import load_conf
-from lib.sound import init_sound
+from lib.sound_player import init_sound
 from lib.ui import start_ui
 
 DEFAULT_CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     init_sound()
     start_ui(args.startup_path)
 
-    # from lib.sound import SoundPlayer
+    # from lib.sound_player import SoundPlayer
     # from gi.repository import GObject, Gst, GLib
     # import threading, time
     # mainloop = GLib.MainLoop()

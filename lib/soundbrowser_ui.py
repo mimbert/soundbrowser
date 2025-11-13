@@ -1,7 +1,8 @@
 import os, os.path, enum
 from lib.config import config, save_conf, STARTUP_PATH_MODE_SPECIFIED_PATH, STARTUP_PATH_MODE_LAST_PATH
 from lib.utils import split_path_filename, format_duration
-from lib.sound import SoundManager, SoundPlayer, PlayerStates, PlaybackDirection
+from lib.sound_player import SoundPlayer, PlayerStates, PlaybackDirection
+from lib.sound_manager import SoundManager
 from lib.logger import log
 from PySide2 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
