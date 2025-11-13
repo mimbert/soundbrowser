@@ -485,12 +485,12 @@ class SoundPlayer():
         return f"gst_msg={dump_gst_message(args.gst_msg)} player_msg={dump_player_message(args.player_msg) if args.player_msg else args.player_msg}"
 
     def log_state_machine_error(self, args):
-        log.error(f"sound player state machine error: current_state={self._player_state} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
+        log.error(f"sound player state machine error: current_state={self.player_state} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
         log_callstack()
 
     def wait_player_state(self, player_states):
         if threading.current_thread() != self._bus_wath_thread and self._bus_wath_thread != None:
-            while self._player_state not in player_states:
+            while self.player_state not in player_states:
                 with self._player_state_change_cv:
                     self._player_state_change_cv.wait()
                     # est-ce que je met le whith CV autour du while ou
@@ -508,8 +508,8 @@ class SoundPlayer():
 
     def __change_player_state(self, new_state):
         with self._player_state_change_cv:
-            self._player_state = new_state
-            self._player_state_handler = SoundPlayer._msg_player_state_handlers[self._player_state][1](self)
+            self.player_state = new_state
+            self._player_state_handler = SoundPlayer._msg_player_state_handlers[self.player_state][1](self)
             next(self._player_state_handler)
             self._player_state_change_cv.notify()
         self.notify_state_change(new_state)
@@ -535,14 +535,14 @@ class SoundPlayer():
             current_state_handles_this_message = False
             player_message = None
             if message.type != Gst.MessageType.APPLICATION:
-                if message.type in SoundPlayer._msg_player_state_handlers[self._player_state][0]:
+                if message.type in SoundPlayer._msg_player_state_handlers[self.player_state][0]:
                     current_state_handles_this_message = True
             else:
                 player_message, player_message_args = extract_player_message(message)
-                if player_message in SoundPlayer._msg_player_state_handlers[self._player_state][0][Gst.MessageType.APPLICATION]:
+                if player_message in SoundPlayer._msg_player_state_handlers[self.player_state][0][Gst.MessageType.APPLICATION]:
                     current_state_handles_this_message = True
             if current_state_handles_this_message:
-                log.debug(brightmagenta(f"player state {self._player_state.name} received {dump_gst_message(message)}"))
+                log.debug(brightmagenta(f"player state {self.player_state.name} received {dump_gst_message(message)}"))
                 new_player_state = self._player_state_handler.send(types.SimpleNamespace(gst_msg=message, player_msg=player_message))
                 if new_player_state != None:
                     # note that if new_player_state is the same state
@@ -550,10 +550,10 @@ class SoundPlayer():
                     # change, which instanciate a new "state
                     # transition" generator and will notify the state
                     # change cond var
-                    log.debug(brightgreen(f"player state change from {self._player_state} to {new_player_state}"))
+                    log.debug(brightgreen(f"player state change from {self.player_state} to {new_player_state}"))
                     self.__change_player_state(new_player_state)
                 else:
-                    log.debug(brightgreen(f"player state stays {self._player_state}"))
+                    log.debug(brightgreen(f"player state stays {self.player_state}"))
         return True
 
     # ------------------------------------------------------------------------

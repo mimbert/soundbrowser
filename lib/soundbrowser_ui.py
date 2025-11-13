@@ -12,13 +12,6 @@ from lib.prefsdialog_ui import PrefsDialog
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 200
 
-# Sound playing state from the UI's point of view
-# (not to be confused with gstteamer state which is only PLAYING or PAUSED)
-class SoundState(enum.Enum):
-    STOPPED = 0
-    PLAYING = 1
-    PAUSED = 2
-
 class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     update_metadata_to_current_playing_message = QtCore.Signal()
@@ -26,7 +19,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def __init__(self, startup_path, app):
         super().__init__()
         self.app = app
-        self._state = SoundState.STOPPED
         self.current_sound_selected = None
         self.current_sound_playing = None
         self.in_keyboard_press_event = False
@@ -61,41 +53,21 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.update_metadata_to_current_playing_message.emit()
 
     def sound_player_state_changed(self, state):
-        if state in [ PlayerStates.UNKNOWN, PlayerStates.PAUSED, PlayerStates.ERROR ]:
-            # pb: comment savoir si on va vers paused ou stopped il
-            # faudrait que j'ai un notify_sound_playing() et
-            # notify_sound_paused(), et éventuellement que tout soit
-            # fait en asynchrone, c'est à dire que ces notifications
-            # soient faites uniquement via les changements d'état du
-            # player (pas depuis les fonctions play pause stop) pour
-            # cela comment distiunguer paused de stopped? via la cause
-            # du state change? en ajoutant un état STOPPED au player?
-            self.state = SoundState.STOPPED
+        if state in [ PlayerStates.UNKNOWN, PlayerStates.ERROR, PlayerStates, PlayerStates.STOPPED ]:
             self.notify_sound_stopped()
-        else:
-            self.state = SoundState.PLAYING
-
-    def __str__(self):
-        return f"SoundBrowserUI <state={self.state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
-
-    @property
-    def state(self):
-        return self._state
-
-    @state.setter
-    def state(self, value):
-        self._state = value
-        if value == SoundState.STOPPED:
             self.play_button.setIcon(self.play_icon)
             self.update_ui_to_selection()
-        elif value == SoundState.PLAYING:
+        elif state == PlayerStates.PLAYING:
             self.play_button.setIcon(self.pause_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
-        elif value == SoundState.PAUSED:
+        elif state == PlayerStates.PAUSED:
             self.play_button.setIcon(self.play_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
+
+    def __str__(self):
+        return f"SoundBrowserUI <state={self.player.player_state}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
 
     def clean_close(self):
         config['main_window_geometry'] = self.saveGeometry().data()
@@ -216,7 +188,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         reload_sound_action = QtWidgets.QAction("Reload", self.tableView)
         self.tableView_contextMenu.addAction(reload_sound_action)
         reload_sound_action.triggered.connect(self.reload_sound)
-        self.state = SoundState.STOPPED
         tableView_return_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Return), self.tableView)
         tableView_enter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Enter), self.tableView)
         tableView_return_shortcut.setContext(QtCore.Qt.WidgetShortcut)
@@ -294,7 +265,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.clear_metadata_pane()
         else:
             self.current_sound_selected = None
-        if self.state == SoundState.STOPPED:
+        if self.player.player_state == PlayerStates.STOPPED:
             self.update_ui_to_selection()
 
     def update_metadata_field(self, field, value, force = None):
@@ -496,7 +467,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def play_clicked(self, checked):
-        if self.state in [ SoundState.STOPPED, SoundState.PAUSED ] :
+        if self.player.player_state in [ PlayerStates.STOPPED, PlayerStates.PAUSED ] :
             self.play()
         else:
             self.pause()
@@ -516,7 +487,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         return self.seek_slider.orig_mouseMoveEvent(mouse_event)
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
+        if self.player.playe_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
             self.seek(self.get_slider_pos(mouse_event))
         else:
             if self.current_sound_selected:
@@ -530,7 +501,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.semitone = value
 
     def notify_sound_stopped(self):
-        self.state = SoundState.STOPPED
         self.disable_seek_pos_updates()
         self.seek_slider.setValue(100.0)
         log.debug(f"sound reached end")
@@ -588,34 +558,30 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             log.error(f"play called with no sound selected nor playing")
             return
-        if self.state in [ SoundState.PLAYING, SoundState.PAUSED ]:
+        if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
             self.player.stop()
-            self.state = SoundState.STOPPED
         if self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
             self.player.set_path(self.current_sound_selected.path)
             self.current_sound_playing = self.current_sound_selected
         elif self.current_sound_playing.file_changed():
             self.player.set_path(self.current_sound_playing.path)
         self.player.play(start_pos)
-        self.state = SoundState.PLAYING
         self.enable_seek_pos_updates()
 
     def pause(self):
         log.debug(f"pause {self}")
-        if not self.state == SoundState.PLAYING:
+        if not self.player.player_state == PlayerStates.PLAYING:
             log.error(f"pause called with state = {self.state.name}")
             return
         if not self.current_sound_playing:
             log.error(f"pause called with current_sound_playing = {self.current_sound_playing}")
             return
         self.player.pause()
-        self.state = SoundState.PAUSED
         self.disable_seek_pos_updates()
 
     def stop(self):
         log.debug(f"stop {self}")
         self.player.stop()
-        self.state = SoundState.STOPPED
         self.disable_seek_pos_updates()
         self._current_sound_playing = None
         self.seek_slider.setValue(0.0)
