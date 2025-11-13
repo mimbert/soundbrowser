@@ -438,10 +438,6 @@ class SoundPlayer():
         else:
             yield PlayerStates.PAUSED
 
-    def _error_state_transition_handler(self):
-        while True:
-            args = yield None
-
     # ------------------------------------------------------------------------
     # player states transitions matrix
 
@@ -478,7 +474,7 @@ class SoundPlayer():
         ),
         PlayerStates.ERROR: (
             {},
-            _error_state_transition_handler
+            _unknown_state_transition_handler
         ),
     }
 
