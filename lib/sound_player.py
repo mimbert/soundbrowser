@@ -186,12 +186,11 @@ def parse_tag_list(taglist):
                 gst_mem = sample.get_buffer().get_all_memory()
                 map_ok, map_info = gst_mem.map(Gst.MapFlags.READ)
                 if map_ok:
-                    map_data = map_info.data
-                    img = QtGui.QImage()
-                    img.loadFromData(map_data)
-                    img = QtGui.QPixmap(img)
-                    value_tuple = (True, img)
-                    gst_mem.unmap(map_info)
+                    try:
+                        map_data = bytes(map_info.data)
+                        value_tuple = (True, map_data)
+                    finally:
+                        gst_mem.unmap(map_info)
                 else:
                     log.warn(f"unsuccessful map gst_memory={gst_mem} tag={i}/{tag_name} of {taglist}")
             else:

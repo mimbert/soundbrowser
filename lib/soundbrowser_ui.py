@@ -51,6 +51,12 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
 
     def update_metadata(self, metadata):
+        for container_format in metadata:
+            if 'image' in metadata[container_format]:
+                img = QtGui.QImage()
+                img.loadFromData(metadata[container_format]['image'])
+                img = QtGui.QPixmap(img)
+                metadata[container_format]['image'] = img
         self.current_sound_playing.update_metadata(metadata)
         self.update_metadata_to_current_playing_message.emit()
 

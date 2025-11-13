@@ -17,11 +17,11 @@ class Sound():
         return f"Sound@0x{id(self):x}<path={self.path}>"
 
     def update_metadata(self, metadata):
-        for k in metadata:
-            if not k in self.metadata:
-                self.metadata[k] = {}
-            self.metadata[k].update(metadata[k])
-            self.metadata['all'].update(metadata[k])
+        for container_format in metadata:
+            if not container_format in self.metadata:
+                self.metadata[container_format] = {}
+            self.metadata[container_format].update(metadata[container_format])
+            self.metadata['all'].update(metadata[container_format])
 
     def file_changed(self):
         try:
