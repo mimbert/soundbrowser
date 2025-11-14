@@ -14,7 +14,7 @@ class Sound():
         self.stat_result = stat_result
 
     def __str__(self):
-        return f"Sound@0x{id(self):x}<path={self.path}>"
+        return f"\"{self.path}\""
 
     def update_metadata(self, metadata):
         for container_format in metadata:

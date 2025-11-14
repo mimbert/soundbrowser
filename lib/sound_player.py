@@ -1,5 +1,5 @@
 import re, pathlib, enum, threading, time, inspect, types, contextlib
-from lib.logger import log, lightcyan, lightgreen, brightmagenta, brightgreen, lightblue, log_callstack
+from lib.logger import log, lightcyan, brightmagenta, brightgreen, lightblue, log_callstack
 from gi.repository import GObject, Gst, GLib
 
 SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't

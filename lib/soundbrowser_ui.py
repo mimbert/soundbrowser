@@ -3,7 +3,7 @@ from lib.config import config, save_conf, STARTUP_PATH_MODE_SPECIFIED_PATH, STAR
 from lib.utils import split_path_filename, format_duration
 from lib.sound_player import SoundPlayer, PlayerStates, PlaybackDirection
 from lib.sound_manager import SoundManager
-from lib.logger import log
+from lib.logger import log, brightcyan
 from PySide2 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
 from lib.ui_utils import set_pixmap, set_dark_theme, SbQFileSystemModel, SbQSortFilterProxyModel
@@ -71,7 +71,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.stop_button.setEnabled(True)
 
     def __str__(self):
-        return f"SoundBrowserUI <state={self.player.player_state}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
+        return f"SoundBrowserUI <state={self.player.player_state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
 
     def clean_close(self):
         config['main_window_geometry'] = self.saveGeometry().data()
@@ -553,7 +553,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     # play / pause / stop
 
     def play(self, start_pos=0):
-        log.debug(f"play {self}")
+        log.debug(brightcyan(f"play {self}"))
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             log.error(f"play called with no sound selected nor playing")
             return
@@ -567,7 +567,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.play(start_pos)
 
     def pause(self):
-        log.debug(f"pause {self}")
+        log.debug(brightcyan(f"pause {self}"))
         if not self.player.player_state == PlayerStates.PLAYING:
             log.error(f"pause called with state = {self.state.name}")
             return
@@ -577,7 +577,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.pause()
 
     def stop(self):
-        log.debug(f"stop {self}")
+        log.debug(brightcyan(f"stop {self}"))
         self.player.stop()
         self.seek_slider.setValue(0.0)
 
