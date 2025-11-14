@@ -54,14 +54,18 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def sound_player_state_changed(self, state):
         if state in [ PlayerStates.UNKNOWN, PlayerStates.ERROR, PlayerStates, PlayerStates.STOPPED ]:
-            self.notify_sound_stopped()
+            self.disable_seek_pos_updates()
             self.play_button.setIcon(self.play_icon)
+            self._current_sound_playing = None
             self.update_ui_to_selection()
+            self.seek_slider.setValue(100.0)
         elif state == PlayerStates.PLAYING:
             self.play_button.setIcon(self.pause_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
+            self.enable_seek_pos_updates()
         elif state == PlayerStates.PAUSED:
+            self.disable_seek_pos_updates()
             self.play_button.setIcon(self.play_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
@@ -500,11 +504,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tune_value.setText(str(value))
         self.player.semitone = value
 
-    def notify_sound_stopped(self):
-        self.disable_seek_pos_updates()
-        self.seek_slider.setValue(100.0)
-        log.debug(f"sound reached end")
-
     @QtCore.Slot()
     def reverse_clicked(self, checked = False):
         if checked:
@@ -566,7 +565,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         elif self.current_sound_playing.file_changed():
             self.player.set_path(self.current_sound_playing.path)
         self.player.play(start_pos)
-        self.enable_seek_pos_updates()
 
     def pause(self):
         log.debug(f"pause {self}")
@@ -577,13 +575,10 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             log.error(f"pause called with current_sound_playing = {self.current_sound_playing}")
             return
         self.player.pause()
-        self.disable_seek_pos_updates()
 
     def stop(self):
         log.debug(f"stop {self}")
         self.player.stop()
-        self.disable_seek_pos_updates()
-        self._current_sound_playing = None
         self.seek_slider.setValue(0.0)
 
     # def seek(self, position):
