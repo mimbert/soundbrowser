@@ -530,8 +530,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 signals_blocked = self.seek_slider.blockSignals(True)
                 self.seek_slider.setValue(position * 100.0 / duration)
                 self.seek_slider.blockSignals(signals_blocked)
-                if position >= duration and not config['play_looped']:
-                    self.notify_sound_stopped()
 
     def enable_seek_pos_updates(self):
         log.debug(f"enable seek pos updates")
