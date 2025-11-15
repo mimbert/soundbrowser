@@ -494,7 +494,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         return self.seek_slider.orig_mouseMoveEvent(mouse_event)
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        if self.player.playe_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
+        if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
             self.seek(self.get_slider_pos(mouse_event))
         else:
             if self.current_sound_selected:
