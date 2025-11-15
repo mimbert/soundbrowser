@@ -28,6 +28,12 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         audio_sink_properties_backspace_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
         audio_sink_properties_backspace_shortcut.activated.connect(self.audio_sink_prop_del)
 
+    def get_actual_selected_audio_sink_name(self):
+        if self.audio_output.currentText() == DEFAULT_SINK_DISPLAY_NAME:
+            return ''
+        else:
+            return self.audio_output.currentText()
+
     @QtCore.Slot()
     def specified_path_button_clicked(self, checked = False):
         path = QtWidgets.QFileDialog.getExistingDirectory(self, "startup path", self.specified_path.text())
@@ -36,22 +42,28 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
     @QtCore.Slot()
     def fill_audio_sink_properties(self):
-        audiosink = self.audio_output.currentText()
-        available_properties = get_available_gst_factory_supported_properties(audiosink)
+        audiosink = self.get_actual_selected_audio_sink_name()
+        if audiosink == '':
+            available_properties = {}
+        else:
+            available_properties = get_available_gst_factory_supported_properties(audiosink)
         self.audio_output_properties.blockSignals(True)
         self.audio_output_properties.clear()
         self.audio_output_properties.setHorizontalHeaderLabels([ 'property', 'value' ])
         self.audio_output_properties.setRowCount(0)
         if audiosink in self.tmpconfig['gst_audio_sink_properties']:
             self.audio_output_properties.setRowCount(len(self.tmpconfig['gst_audio_sink_properties'][audiosink]))
-            for i, config_prop in enumerate(self.tmpconfig['gst_audio_sink_properties'][audiosink]):
-                del available_properties[config_prop]
-                kitem = QtWidgets.QTableWidgetItem(config_prop)
-                kitem.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
-                vitem = QtWidgets.QTableWidgetItem(self.tmpconfig['gst_audio_sink_properties'][audiosink][config_prop])
-                vitem.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
-                self.audio_output_properties.setItem(i, 0, kitem)
-                self.audio_output_properties.setItem(i, 1, vitem)
+            for i, config_prop in enumerate(list(self.tmpconfig['gst_audio_sink_properties'][audiosink])):
+                if config_prop in available_properties:
+                    del available_properties[config_prop]
+                    kitem = QtWidgets.QTableWidgetItem(config_prop)
+                    kitem.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
+                    vitem = QtWidgets.QTableWidgetItem(self.tmpconfig['gst_audio_sink_properties'][audiosink][config_prop])
+                    vitem.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+                    self.audio_output_properties.setItem(i, 0, kitem)
+                    self.audio_output_properties.setItem(i, 1, vitem)
+                else:
+                    del self.tmpconfig['gst_audio_sink_properties'][audiosink][config_prop]
         prop_selection_combo = QtWidgets.QComboBox(self.audio_output_properties)
         prop_selection_combo.addItems(sorted(available_properties.keys()))
         self.audio_output_properties.setRowCount(self.audio_output_properties.rowCount() + 1)
@@ -69,22 +81,20 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
             row = item.row()
             if row >= 0 and row < self.audio_output_properties.rowCount() - 1:
                 propkey = self.audio_output_properties.item(row, 0).text()
-                del self.tmpconfig['gst_audio_sink_properties'][self.audio_output.currentText()][propkey]
+                del self.tmpconfig['gst_audio_sink_properties'][self.get_actual_selected_audio_sink_name()][propkey]
                 self.audio_output_properties.removeRow(row)
                 self.update_audio_sink_properties.emit()
 
     @QtCore.Slot()
     def audio_sink_prop_value_changed(self, item):
-        if self.audio_output.currentText() not in self.tmpconfig['gst_audio_sink_properties']:
-            self.tmpconfig['gst_audio_sink_properties'] \
-                [self.audio_output.currentText()] = {}
+        if self.get_actual_selected_audio_sink_name() not in self.tmpconfig['gst_audio_sink_properties']:
+            self.tmpconfig['gst_audio_sink_properties'][self.get_actual_selected_audio_sink_name()] = {}
         if item.row() == self.audio_output_properties.rowCount() - 1:
             propkey = self.audio_output_properties.cellWidget(item.row(), 0).currentText()
         else:
             propkey = self.audio_output_properties.item(item.row(), 0).text()
-        self.tmpconfig['gst_audio_sink_properties'] \
-            [self.audio_output.currentText()][propkey] \
-            = self.audio_output_properties.item(item.row(), 1).text()
+        self.tmpconfig['gst_audio_sink_properties'][self.get_actual_selected_audio_sink_name()][propkey] = \
+            self.audio_output_properties.item(item.row(), 1).text()
         self.update_audio_sink_properties.emit()
 
     def exec_prefs(self):
@@ -112,7 +122,11 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         self.audio_output.addItems( [DEFAULT_SINK_DISPLAY_NAME] + [ fname for fname in self.available_gst_audio_sink_factories ])
         self.audio_output.blockSignals(False)
         self.audio_output.currentIndexChanged.connect(self.audio_output_index_changed)
-        self.audio_output.setCurrentIndex(self.audio_output.findText(self.tmpconfig['gst_audio_sink']))
+        current_config_sink_index = self.audio_output.findText(DEFAULT_SINK_DISPLAY_NAME if self.tmpconfig['gst_audio_sink'] == '' else self.tmpconfig['gst_audio_sink'])
+        if current_config_sink_index == -1:
+            self.audio_output.setCurrentIndex(0)
+        else:
+            self.audio_output.setCurrentIndex(current_config_sink_index)
         self.fill_audio_sink_properties()
         if self.exec_():
             self.tmpconfig['autoplay_mouse'] = self.check_autoplay_mouse.isChecked()
@@ -130,10 +144,10 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
                 self.tmpconfig['startup_path_mode'] = STARTUP_PATH_MODE_HOME_DIR
             self.tmpconfig['specified_path'] = self.specified_path.text()
             self.tmpconfig['file_extensions_filter'] = self.file_extensions_filter.text().split(' ')
-            self.tmpconfig['gst_audio_sink'] = self.audio_output.currentText()
+            self.tmpconfig['gst_audio_sink'] = self.get_actual_selected_audio_sink_name()
             config.update(self.tmpconfig)
             self.parentWidget().refresh_config()
-            self.configure_audio_output()
+            self.parentWidget().configure_audio_output()
         else:
             self.parentWidget().refresh_config()
 
@@ -144,7 +158,7 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
 
     @QtCore.Slot()
     def audio_output_index_changed(self):
-        audiosink = self.audio_output.currentText()
+        audiosink = self.get_actual_selected_audio_sink_name()
         for o in [ self.label_gst_aa_details, self.label_aa_long_name,
                    self.audio_output_long_name, self.label_aa_description,
                    self.audio_output_description, self.audio_output_description,
@@ -152,11 +166,8 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
                    self.label_aa_plugin_description, self.audio_output_plugin_description,
                    self.label_aa_plugin_package, self.audio_output_plugin_package,
                    self.label_aa_properties, self.audio_output_properties ]:
-            o.setEnabled(audiosink not in [ DEFAULT_SINK_DISPLAY_NAME, '' ])
+            o.setEnabled(audiosink != '')
         if audiosink == '':
-            audiosink == DEFAULT_SINK_DISPLAY_NAME
-            #self.audio_output.itemText(DEFAULT_SINK_DISPLAY_NAME)
-        if audiosink == DEFAULT_SINK_DISPLAY_NAME:
             factory = None
             for o in [ self.audio_output_long_name, self.audio_output_description,
                        self.audio_output_plugin, self.audio_output_plugin_description,

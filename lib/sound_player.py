@@ -39,8 +39,9 @@ def _get_boolean_prop_specs(prop):
     }
 
 def _get_enum_prop_specs(prop):
+    return {}
     values = []
-    for v in range(prop.enum_class.minimum, prop.enum_class.maximum + 1):
+    for v in prop.enum_class._value2member_map_:
         values.append((v, GObject.enum_to_string(prop.value_type, v)))
     return {
         'values': values,
@@ -68,6 +69,18 @@ _supported_property_types = {
     GObject.ParamSpecDouble: _get_numeric_prop_specs,
 }
 
+def _cast_str_to_prop_pytype(prop, s):
+    if prop.value_type.name == 'gchararray':
+        return s
+    elif prop.value_type.name == 'gboolean':
+        return s.lower() in [ 'true', '1' ]
+    elif prop.value_type.name in [ 'gint64', 'guint', 'gint64', 'gint' ]:
+        return int(s)
+    elif prop.value_type.name == 'gdouble':
+        return float(s)
+    else:
+        return s
+
 def get_available_gst_audio_sink_factories():
     factories = Gst.Registry.get().get_feature_list(Gst.ElementFactory)
     audio_sinks_factories = [ f for f in factories if ('Audio' in f.get_metadata('klass') and ('sink' in f.name or 'Sink' in f.get_metadata('klass'))) ]
@@ -81,34 +94,26 @@ def get_available_gst_audio_sink_factories():
 
 def get_available_gst_factory_supported_properties(factory_name):
     element = Gst.ElementFactory.make(factory_name, None)
+    if not element:
+        log.warn(f"unable to instanciate sink {factory_name}")
+        return {}
     properties = {}
     for p in element.list_properties():
         if not(p.flags & GObject.ParamFlags.WRITABLE):
             continue
         properties[p.name] = p
     log.debug(f"available properties for gst audio sink {factory_name}:")
-    for p in list(properties):
+    property_specs = {}
+    for p in properties:
         prop_type_name = properties[p].g_type_instance.g_class.g_type.name
         prop_pytype = properties[p].g_type_instance.g_class.g_type.pytype
         if prop_pytype not in _supported_property_types:
-            log.debug(f"  (remove unhandled property {p} of type {prop_type_name})")
-            del properties[p]
+            log.debug(f"  (ignore unhandled property {p} of type {prop_type_name})")
         else:
-            properties[p] = ( properties[p], _supported_property_types[prop_pytype](properties[p]) )
-            log.debug(f"  {p}: {prop_type_name} {properties[p][1]}")
-    return properties
-
-def _cast_str_to_prop_pytype(prop, s):
-    if prop.value_type.name == 'gchararray':
-        return s
-    elif prop.value_type.name == 'gboolean':
-        return s.lower() in [ 'true', '1' ]
-    elif prop.value_type.name in [ 'gint64', 'guint', 'gint64', 'gint' ]:
-        return int(s)
-    elif prop.value_type.name == 'gdouble':
-        return float(s)
-    else:
-        return s
+            prop_specs = _supported_property_types[prop_pytype](properties[p])
+            property_specs[p] = { 'property': properties[p], **prop_specs }
+            log.debug(f"  {p}: {prop_type_name} {prop_specs}")
+    return property_specs
 
 # ------------------------------------------------------------------------
 # dumping functions for nice logs
@@ -269,34 +274,36 @@ class SoundPlayer():
                 log.debug(f"gst sink '{gst_sink_factory_name}' is available")
         if gst_sink_factory_name:
             available_properties = get_available_gst_factory_supported_properties(gst_sink_factory_name)
-            for prop in list(gst_sink_properties.keys()):
-                log.debug(f"check if property '{prop}' is available for gst sink '{gst_sink_factory_name}'")
-                if prop not in available_properties:
-                    log.info(f"unavailable property '{prop}' for gst sink '{gst_sink_factory_name}'")
-                    del gst_sink_properties[prop]
+            for prop_name in list(gst_sink_properties.keys()):
+                log.debug(f"check if property '{prop_name}' is available for gst sink '{gst_sink_factory_name}'")
+                if prop_name not in available_properties:
+                    log.info(f"unavailable property '{prop_name}' for gst sink '{gst_sink_factory_name}'")
+                    del gst_sink_properties[prop_name]
             log.debug(f"instanciate gst sink '{gst_sink_factory_name}'")
             gst_sink_instance = Gst.ElementFactory.make(gst_sink_factory_name)
-            for k, v in list(gst_sink_properties.items()):
+            for prop_name, prop_value in list(gst_sink_properties.items()):
                 try:
-                    prop_val = _cast_str_to_prop_pytype(available_properties[k][0], v)
-                    log.debug(f"gst sink '{gst_sink_factory_name}': set property '{k}' to value '{prop_val}'")
-                    gst_sink_instance.set_property(k, prop_val)
+                    pytype_prop_value = _cast_str_to_prop_pytype(available_properties[prop_name]['property'], prop_value)
+                    log.debug(f"gst sink '{gst_sink_factory_name}': set property '{prop_name}' to value '{pytype_prop_value}'")
+                    gst_sink_instance.set_property(prop_name, pytype_prop_value)
                 except:
-                    log.error(f"gst sink '{gst_sink_factory_name}': unable to set property '{k}' to value '{prop_val}'")
-                    del gst_sink_properties[k]
+                    log.error(f"gst sink '{gst_sink_factory_name}': unable to set property '{prop_name}' to value '{pytype_prop_value}'")
+                    del gst_sink_properties[prop_name]
             try:
                 self.gst_player.set_property("audio-sink", gst_sink_instance)
                 log.debug(f"gst playbin: set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
+                return True, gst_sink_factory_name, gst_sink_properties
             except:
                 log.error(f"gst playbin: unable to set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
                 return False, gst_sink_factory_name, gst_sink_properties
-        if self.gst_player.get_property('audio-sink') and self.gst_player.get_property('audio-sink').get_factory():
-            actual_gst_sink_factory_name = self.gst_player.get_property('audio-sink').get_factory().name
-            return True, actual_gst_sink_factory_name, gst_sink_properties
         else:
-            actual_gst_sink_factory_name = ''
-            log.debug(f"gst playbin has no explicit sink set, will use the default sink")
-            return True, actual_gst_sink_factory_name, {}
+            try:
+                self.gst_player.set_property("audio-sink", None)
+                log.debug(f"gst playbin: set audiosink to None (default, auto-selected)")
+                return True, gst_sink_factory_name, {}
+            except:
+                log.error(f"gst playbin: unable to set audiosink to None (default, auto-selected)")
+                return False, gst_sink_factory_name, gst_sink_properties
 
     # ------------------------------------------------------------------------
     # playback rate

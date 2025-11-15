@@ -24,15 +24,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.in_keyboard_press_event = False
         self.manager = SoundManager()
         self.player = SoundPlayer()
-        audio_config_success, gst_audio_sink, gst_audio_sink_properties = self.player.configure_audio_output(
-            config['gst_audio_sink'],
-            config['gst_audio_sink_properties'][config['gst_audio_sink']])
-        if audio_config_success:
-            log.debug(f"successfuly configured gst_audio_sink={gst_audio_sink} properties={gst_audio_sink_properties}")
-            config['gst_audio_sink'] = gst_audio_sink
-            config['gst_audio_sink_properties'][config['gst_audio_sink']] = gst_audio_sink_properties
-        else:
-            log.warn(f"failed configuring gst_audio_sink={config['gst_audio_sink']} properties={config['gst_audio_sink_properties'][config['gst_audio_sink']]}")
+        self.configure_audio_output()
         self.player.set_metadata_callback(self.update_metadata)
         self.player.set_state_change_callback(self.sound_player_state_changed)
         self.setupUi(self)
@@ -41,6 +33,17 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.seek_min_interval_timer = None
         self.seek_next_value = None
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
+
+    def configure_audio_output(self):
+        audio_config_success, gst_audio_sink, gst_audio_sink_properties = self.player.configure_audio_output(
+            config['gst_audio_sink'],
+            config['gst_audio_sink_properties'].get(config['gst_audio_sink'], {}))
+        if audio_config_success:
+            log.debug(f"successfuly configured gst_audio_sink={gst_audio_sink} properties={gst_audio_sink_properties}")
+            config['gst_audio_sink'] = gst_audio_sink
+            config['gst_audio_sink_properties'][config['gst_audio_sink']] = gst_audio_sink_properties
+        else:
+            log.warn(f"failed configuring gst_audio_sink={config['gst_audio_sink']} properties={config['gst_audio_sink_properties'][config['gst_audio_sink']]}")
 
     def update_metadata(self, metadata):
         for container_format in metadata:
