@@ -33,7 +33,7 @@ DEFAULT_CONF_FILE = os.path.expanduser("~/.soundbrowser.conf.yaml")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sound Browser')
-    parser.add_argument('-d', '--debug', action='count', default=0, help='enable debug output')
+    parser.add_argument('-d', '--debug', action='count', default=0, help='enable debug output (multiple d increase verbosity)')
     parser.add_argument('-c', '--conf_file', type=str, default=DEFAULT_CONF_FILE, help=f'use alternate conf file (default={DEFAULT_CONF_FILE})')
     parser.add_argument('startup_path', nargs='?', help='open this path')
     args = parser.parse_args()

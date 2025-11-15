@@ -82,11 +82,17 @@ file on exit, so if you need to edit it, quit *Soundbrowser* before.
 
 ## TODO
 
-* add support for drag and drop
+* fix looping
 
-* add preloading of metadata of all files in directory in background
-  (currently only gets metadata when sound is played, through
-  gstreamer events)
+* fix reverse play
+
+* fix tune control
+
+* fix seeking
+
+* fix seek pos at stop (depending on stop cause)
+
+* qt6
 
 ## Motivations and goals
 
