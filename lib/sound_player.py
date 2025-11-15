@@ -545,7 +545,8 @@ class SoundPlayer():
                     current_state_handles_this_message = True
             else:
                 player_message, player_message_args = extract_player_message(message)
-                if player_message in SoundPlayer._msg_player_state_handlers[self.player_state][0][Gst.MessageType.APPLICATION]:
+                if (Gst.MessageType.APPLICATION in SoundPlayer._msg_player_state_handlers[self.player_state][0]
+                    and player_message in SoundPlayer._msg_player_state_handlers[self.player_state][0][Gst.MessageType.APPLICATION]):
                     current_state_handles_this_message = True
             if current_state_handles_this_message:
                 log.debug(brightmagenta(f"player state {self.player_state.name} received {dump_gst_message(message)}"))
