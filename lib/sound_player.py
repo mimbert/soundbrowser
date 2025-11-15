@@ -393,8 +393,7 @@ class SoundPlayer():
         flags = self.gst_player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)
         # disable video, subtitles, visualisation
         log.debug(f"set flags of gst player to 0x{flags:08x}")
-        self.gst_player.set_property('flags',
-                                     flags)
+        self.gst_player.set_property('flags', flags)
         # following 4 lines not needed anymore: the gst state
         # corresponding to player state paused is gst_ready
         # log.debug(f"set gst state to PAUSED")
