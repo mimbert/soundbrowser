@@ -10,6 +10,7 @@ lib/ui_lib/soundbrowser_rc.py: lib/ui_lib/soundbrowser.qrc lib/ui_lib/*.png
 clean:
 	rm -rf lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
 	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name '*.pyc' -exec rm -rf {} +
 
 dist: clean all
 	rsync -am --delete --include='*.py' --include='*.png' --exclude='build/' --include='*/' --exclude='*' . build/
