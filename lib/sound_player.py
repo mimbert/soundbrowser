@@ -1,5 +1,5 @@
 import re, pathlib, enum, threading, time, inspect, types, contextlib
-from lib.logger import log, lightcyan, brightmagenta, brightgreen, lightblue, log_callstack
+from lib.logger import log, lightcyan, brightmagenta, lightgreen, brightgreen, lightblue, log_callstack
 from gi.repository import GObject, Gst, GLib
 
 SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't
@@ -385,7 +385,7 @@ class SoundPlayer():
             log.debug(f"seek is not flushing, do not wait for ASYNC_DONE")
 
     def _set_uri(self, uri, next_state):
-        log.debug(f"set gst state to READY")
+        log.debug(lightgreen(f"set gst state to READY"))
         state_change_retval = self.gst_player.set_state(Gst.State.READY)
         yield from self._wait_gst_state_change(state_change_retval)
         log.debug(f"set property uri of gst player to '{uri}'")
@@ -396,7 +396,7 @@ class SoundPlayer():
         self.gst_player.set_property('flags', flags)
         # following 4 lines not needed anymore: the gst state
         # corresponding to player state paused is gst_ready
-        # log.debug(f"set gst state to PAUSED")
+        # log.debug(lightgreen(f"set gst state to PAUSED"))
         # state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
         # yield from self._wait_gst_state_change(state_change_retval)
         # yield from self._send_seek(self.reset_seek)
@@ -418,11 +418,11 @@ class SoundPlayer():
         if args.player_msg == PlayerMessages.SET_URI:
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
         elif args.player_msg == PlayerMessages.ASK_PLAY:
-            log.debug(f"set gst state to PAUSED")
+            log.debug(lightgreen(f"set gst state to PAUSED"))
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_gst_state_change(state_change_retval)
             #yield from self._send_seek(self.reset_seek)
-            log.debug(f"set gst state to PLAYING")
+            log.debug(lightgreen(f"set gst state to PLAYING"))
             state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
             yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
             yield PlayerStates.PLAYING
@@ -432,12 +432,12 @@ class SoundPlayer():
         while not ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
                     or args.player_msg in [ PlayerMessages.ASK_PAUSE, PlayerMessages.ASK_STOP ] ):
             args = yield None
-        log.debug(f"set gst state to PAUSED")
+        log.debug(lightgreen(f"set gst state to PAUSED"))
         state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
         yield from self._wait_gst_state_change(state_change_retval)
         if ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
              or args.player_msg == PlayerMessages.ASK_STOP ):
-            log.debug(f"set gst state to READY")
+            log.debug(lightgreen(f"set gst state to READY"))
             state_change_retval = self.gst_player.set_state(Gst.State.READY)
             yield from self._wait_gst_state_change(state_change_retval)
             yield PlayerStates.STOPPED
