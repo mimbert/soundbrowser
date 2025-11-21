@@ -466,6 +466,18 @@ class SoundPlayer():
             yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
             yield PlayerStates.PLAYING
 
+    def _paused_state_transition_handler(self):
+        args = yield None
+        while args.player_msg not in [ PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI ]:
+            args = yield None
+        if args.player_msg == PlayerMessages.SET_URI:
+            yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
+        elif args.player_msg == PlayerMessages.ASK_PLAY:
+            log.debug(lightgreen(f"set gst state to PLAYING"))
+            state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
+            yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
+            yield PlayerStates.PLAYING
+
     def _playing_state_transition_handler(self):
         args = yield None
         while not ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
@@ -506,7 +518,7 @@ class SoundPlayer():
                 Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, ),
                 Gst.MessageType.ASYNC_DONE: None,
             },
-            _stopped_state_transition_handler
+            _paused_state_transition_handler
         ),
         PlayerStates.PLAYING: (
             {
