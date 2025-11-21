@@ -103,7 +103,6 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         self.check_autoplay_keyboard.setChecked(self.tmpconfig['autoplay_keyboard'])
         self.check_dark_theme.setChecked(self.tmpconfig['dark_theme'])
         self.check_dark_theme.stateChanged.connect(self.check_dark_theme_state_changed)
-        self.check_hide_reverse.setChecked(self.tmpconfig['hide_reverse'])
         self.check_hide_tune.setChecked(self.tmpconfig['hide_tune'])
         self.check_reset_tune_between_sounds.setChecked(self.tmpconfig['reset_tune_between_sounds'])
         self.file_extensions_filter.setText(' '.join(self.tmpconfig['file_extensions_filter']))
@@ -131,7 +130,6 @@ class PrefsDialog(prefs_dial.Ui_PrefsDialog, QtWidgets.QDialog):
         if self.exec_():
             self.tmpconfig['autoplay_mouse'] = self.check_autoplay_mouse.isChecked()
             self.tmpconfig['autoplay_keyboard'] = self.check_autoplay_keyboard.isChecked()
-            self.tmpconfig['hide_reverse'] = self.check_hide_reverse.isChecked()
             self.tmpconfig['hide_tune'] = self.check_hide_tune.isChecked()
             self.tmpconfig['reset_tune_between_sounds'] = self.check_reset_tune_between_sounds.isChecked()
             if self.startup_path_mode_specified_path.isChecked():

@@ -84,12 +84,6 @@ file on exit, so if you need to edit it, quit *Soundbrowser* before.
 
 * fix looping
 
-* fix reverse play
-
-* fix tune control
-
-* fix seeking
-
 * fix seek pos at stop (depending on stop cause)
 
 * qt6

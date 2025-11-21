@@ -1,7 +1,7 @@
 import os, os.path, enum
 from lib.config import config, save_conf, STARTUP_PATH_MODE_SPECIFIED_PATH, STARTUP_PATH_MODE_LAST_PATH
 from lib.utils import split_path_filename, format_duration
-from lib.sound_player import SoundPlayer, PlayerStates, PlaybackDirection
+from lib.sound_player import SoundPlayer, PlayerStates
 from lib.sound_manager import SoundManager
 from lib.logger import log, brightcyan, warmyellow
 from PySide2 import QtCore, QtGui, QtWidgets
@@ -102,12 +102,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.bottom_pane.show()
         else:
             self.bottom_pane.hide()
-        if config['hide_reverse']:
-            self.reverse_button.hide()
-            self.line_reverse_button.hide()
-        else:
-            self.reverse_button.show()
-            self.line_reverse_button.show()
         if config['hide_tune']:
             self.tune_dial.hide()
             self.tune_value.hide()
@@ -220,10 +214,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tune_value.setFixedHeight(self.tune_value.height())
         self.tune_value.setText('0')
         self.tune_dial.valueChanged.connect(self.tune_dial_valueChanged)
-        self.reverse_button.setChecked(config['play_reverse'])
-        self.reverse_button.clicked.connect(self.reverse_clicked)
-        reverse_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_R), self)
-        reverse_shortcut.activated.connect(self.reverse_shortcut_activated)
         self.preference_dialog = PrefsDialog(self)
         self.clear_metadata_pane()
         self.tableView.setFocus()
@@ -506,18 +496,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def tune_dial_valueChanged(self, value):
         self.tune_value.setText(str(value))
         self.player.semitone = value
-
-    @QtCore.Slot()
-    def reverse_clicked(self, checked = False):
-        if checked:
-            self.player.direction = PlaybackDirection.BACKWARD
-        else:
-            self.player.direction = PlaybackDirection.FORWARD
-        config['play_reverse'] = checked
-
-    @QtCore.Slot()
-    def reverse_shortcut_activated(self):
-        self.reverse_button.click()
 
     # ------------------------------------------------------------------------
     # sound position update

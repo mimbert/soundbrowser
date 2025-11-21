@@ -754,24 +754,6 @@ Shortcut: f</string>
            </widget>
           </item>
           <item>
-           <widget class="QCheckBox" name="reverse_button">
-            <property name="toolTip">
-             <string>Toggle reverse playback
-Shortcut: r</string>
-            </property>
-            <property name="text">
-             <string>Reverse</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="Line" name="line_reverse_button">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QLabel" name="tune_value">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
