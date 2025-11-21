@@ -234,7 +234,9 @@ class SoundPlayer():
         self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
         self._semitone = 0
         self._direction = PlaybackDirection.FORWARD
-        self.reset_seek = Gst.Event.new_seek(
+        # the reset seek is created here, because creating it from the
+        # bus watch causes deadlocks
+        self._reset_seek = Gst.Event.new_seek(
             self.playback_rate,
             Gst.Format.TIME,
             Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
@@ -327,6 +329,12 @@ class SoundPlayer():
     @property
     def playback_rate(self):
         return get_semitone_ratio(self.semitone) * self.direction.value
+
+    @property
+    def reset_seek(self):
+        reset_seek_struct = self._reset_seek.get_structure()
+        reset_seek_struct.set_value('rate', float(self.playback_rate))
+        return self._reset_seek
 
     # ------------------------------------------------------------------------
     # gst messages / player messages utils
@@ -421,7 +429,21 @@ class SoundPlayer():
             log.debug(lightgreen(f"set gst state to PAUSED"))
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_gst_state_change(state_change_retval)
-            #yield from self._send_seek(self.reset_seek)
+            start_pos = args.gst_msg.get_structure().get_value('start_pos')
+            if start_pos != 0:
+                # first reset, otherwise getting duration will not work for some sounds
+                yield from self._send_seek(self.reset_seek)
+                got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
+                if got_duration:
+                    seek = Gst.Event.new_seek(
+                        self.playback_rate,
+                        Gst.Format.TIME,
+                        Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
+                        Gst.SeekType.SET, start_pos * duration,
+                        Gst.SeekType.SET, duration)
+                    yield from self._send_seek(seek)
+                else:
+                    log.warn(f"unable to seek, because unable to get sound duration")
             log.debug(lightgreen(f"set gst state to PLAYING"))
             state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
             yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
@@ -580,9 +602,10 @@ class SoundPlayer():
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
-    def play(self, from_position=0):
+    def play(self, start_pos=0):
+        # 0 <= start_pos <= 1.0
         with self._get_state_change_lock():
-            self.post_player_message(PlayerMessages.ASK_PLAY, position=from_position)
+            self.post_player_message(PlayerMessages.ASK_PLAY, start_pos=start_pos)
             self.wait_player_state((PlayerStates.PLAYING, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
@@ -600,6 +623,23 @@ class SoundPlayer():
             self.wait_player_state((PlayerStates.STOPPED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
+
+    def seek(self, seek_pos):
+        # 0 <= seek_pos <= 1.0
+        duration, _ = self.get_duration_position()
+        if duration != None:
+            seek = Gst.Event.new_seek(
+                self.playback_rate,
+                Gst.Format.TIME,
+                Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
+                Gst.SeekType.SET, seek_pos * duration,
+                Gst.SeekType.SET, duration)
+            log.debug(f"seek: {dump_gst_seek_event(seek)}")
+            ok = self.gst_player.send_event(seek)
+            if not ok:
+                log.warn(f"send seek={dump_gst_seek_event(update_seek)} returned not ok")
+        else:
+            log.warn(f"unable to seek, because unable to get duration")
 
     def is_seekable(self):
         query = Gst.Query.new_seeking(Gst.Format.TIME)

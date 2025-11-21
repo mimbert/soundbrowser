@@ -3,7 +3,7 @@ from lib.config import config, save_conf, STARTUP_PATH_MODE_SPECIFIED_PATH, STAR
 from lib.utils import split_path_filename, format_duration
 from lib.sound_player import SoundPlayer, PlayerStates, PlaybackDirection
 from lib.sound_manager import SoundManager
-from lib.logger import log, brightcyan
+from lib.logger import log, brightcyan, warmyellow
 from PySide2 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
 from lib.ui_utils import set_pixmap, set_dark_theme, SbQFileSystemModel, SbQSortFilterProxyModel
@@ -31,7 +31,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.populate(startup_path)
         self.seek_pos_update_timer = QtCore.QTimer()
         self.seek_min_interval_timer = None
-        self.seek_next_value = None
+        self.next_seek_pos = None
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
 
     def configure_audio_output(self):
@@ -56,12 +56,11 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.update_metadata_to_current_playing_message.emit()
 
     def sound_player_state_changed(self, state):
-        if state in [ PlayerStates.UNKNOWN, PlayerStates.ERROR, PlayerStates, PlayerStates.STOPPED ]:
+        if state in [ PlayerStates.UNKNOWN, PlayerStates.ERROR, PlayerStates.STOPPED ]:
             self.disable_seek_pos_updates()
             self.play_button.setIcon(self.play_icon)
             self._current_sound_playing = None
             self.update_ui_to_selection()
-            self.seek_slider.setValue(100.0)
         elif state == PlayerStates.PLAYING:
             self.play_button.setIcon(self.pause_icon)
             self.play_button.setEnabled(True)
@@ -238,12 +237,10 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
             self.seek_slider.setEnabled(True)
-            self.seek_slider.setValue(0)
         else:
             self.play_button.setEnabled(False)
             self.stop_button.setEnabled(False)
             self.seek_slider.setEnabled(False)
-            self.seek_slider.setValue(0)
 
     def goto_path(self, path):
         directory, filename = split_path_filename(path)
@@ -274,6 +271,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.current_sound_selected = None
         if self.player.player_state == PlayerStates.STOPPED:
             self.update_ui_to_selection()
+            self.seek_slider.setValue(0)
 
     def update_metadata_field(self, field, value, force = None):
         f = getattr(self, field)
@@ -494,12 +492,14 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         return self.seek_slider.orig_mouseMoveEvent(mouse_event)
 
     def slider_mouseReleaseEvent(self, mouse_event):
+        log.debug(warmyellow(f"slider_mouseReleaseEvent pos={self.get_slider_pos(mouse_event)}"))
+        self.seek_slider.setValue(self.get_slider_pos(mouse_event))
         if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
-            self.seek(self.get_slider_pos(mouse_event))
+            self.seek(self.get_slider_pos(mouse_event) / 100.0)
+            self.enable_seek_pos_updates()
         else:
             if self.current_sound_selected:
-                self.play(self.get_slider_pos(mouse_event))
-        self.enable_seek_pos_updates()
+                self.play(self.get_slider_pos(mouse_event) / 100.0)
         return True
 
     @QtCore.Slot()
@@ -535,26 +535,40 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.seek_slider.blockSignals(signals_blocked)
 
     def enable_seek_pos_updates(self):
-        log.debug(f"enable seek pos updates")
+        log.debug(warmyellow(f"enable seek pos updates"))
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
 
     def disable_seek_pos_updates(self):
-        log.debug(f"disable seek pos updates")
+        log.debug(warmyellow(f"disable seek pos updates"))
         self.seek_pos_update_timer.stop()
 
     @QtCore.Slot()
     def seek_min_interval_timer_fired(self):
-        if self.seek_next_value:
-            self.actual_seek(self.seek_next_value)
-        self.seek_next_value = None
+        if self.next_seek_pos:
+            self.player.seek(self.next_seek_pos)
+        self.next_seek_pos = None
         self.seek_min_interval_timer = None
+
+    def seek(self, seek_pos):
+        # 0 <= seek_pos <= 1.0
+        if self.seek_min_interval_timer != None:
+            log.debug(f"seek to {seek_pos} delayed to limit gst seek events frequency")
+            self.next_seek_pos = position
+        else:
+            self.player.seek(seek_pos)
+            self.next_seek_pos = None
+            self.seek_min_interval_timer = QtCore.QTimer()
+            self.seek_min_interval_timer.setSingleShot(True)
+            self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
+            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
 
     # ------------------------------------------------------------------------
     # play / pause / stop
 
     def play(self, start_pos=0):
-        log.debug(brightcyan(f"play {self}"))
+        # 0 <= start_pos <= 1.0
+        log.debug(brightcyan(f"play {self} start_pos={start_pos}"))
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             log.error(f"play called with no sound selected nor playing")
             return
@@ -581,16 +595,4 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         log.debug(brightcyan(f"stop {self}"))
         self.player.stop()
         self.seek_slider.setValue(0.0)
-
-    # def seek(self, position):
-    #     if self.seek_min_interval_timer != None:
-    #         log.debug(f"seek to {position} delayed to limit gst seek events frequency")
-    #         self.seek_next_value = position
-    #     else:
-    #         self.actual_seek(position)
-    #         self.seek_next_value = None
-    #         self.seek_min_interval_timer = QtCore.QTimer()
-    #         self.seek_min_interval_timer.setSingleShot(True)
-    #         self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
-    #         self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
 
