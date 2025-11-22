@@ -217,6 +217,8 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.preference_dialog = PrefsDialog(self)
         self.clear_metadata_pane()
         self.tableView.setFocus()
+        self.player.semitone = int(self.tune_value.text())
+        self.player.loop = self.loop_button.isChecked()
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
@@ -443,6 +445,8 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def loop_clicked(self, checked = False):
         config['play_looped'] = checked
+        self.stop()
+        self.player.loop = checked
 
     @QtCore.Slot()
     def show_metadata_pane_clicked(self, checked = False):

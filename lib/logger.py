@@ -18,6 +18,9 @@ def lightgreen(s):
 def warmyellow(s):
     return '\033[38;5;220m' + s + '\033[0m'
 
+def warmred(s):
+    return '\033[38;5;204m' + s + '\033[0m'
+
 def brightmagenta(s):
     return '\033[0;1;95m' + s + '\033[0m'
 

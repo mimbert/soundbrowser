@@ -658,30 +658,6 @@ Shortcut: Ctrl-V</string>
            <number>0</number>
           </property>
           <item>
-           <widget class="QCheckBox" name="loop_button">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="toolTip">
-             <string>Toggle play looping
-Shortcut: l</string>
-            </property>
-            <property name="text">
-             <string>Loop</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="Line" name="line_1">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QCheckBox" name="show_metadata_pane_button">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
@@ -743,6 +719,30 @@ Shortcut: f</string>
             </property>
             <property name="text">
              <string>Filter Files</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="line_1">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="loop_button">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>Toggle play looping
+Shortcut: l</string>
+            </property>
+            <property name="text">
+             <string>Loop</string>
             </property>
            </widget>
           </item>
