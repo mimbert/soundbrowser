@@ -644,7 +644,7 @@ class SoundPlayer():
                     and player_message in SoundPlayer._msg_player_state_handlers[self.player_state][0][Gst.MessageType.APPLICATION]):
                     current_state_handles_this_message = True
             if current_state_handles_this_message:
-                log.debug(brightmagenta(f"player state {self.player_state.name} received {dump_gst_message(message)}"))
+                log.debug(brightmagenta(f"send {dump_gst_message(message)} to player state {self.player_state.name}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
                 new_player_state = self._player_state_handler.send(types.SimpleNamespace(gst_msg=message, player_msg=player_message))
                 if new_player_state != None:
                     # note that if new_player_state is the same state
@@ -654,8 +654,9 @@ class SoundPlayer():
                     # change cond var
                     log.debug(brightgreen(f"player state change from {self.player_state} to {new_player_state}"))
                     self.__change_player_state(new_player_state)
+                    log.debug(brightgreen(f"new player state {self.player_state}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
                 else:
-                    log.debug(brightgreen(f"player state stays {self.player_state}"))
+                    log.debug(brightgreen(f"player state stays {self.player_state}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
         return True
 
     # ------------------------------------------------------------------------
