@@ -550,7 +550,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def play(self, start_pos=0):
         # 0 <= start_pos <= 1.0
-        log.debug(brightcyan(f"play {self} start_pos={start_pos}"))
+        log.debug(brightcyan(f"PLAY" + (f" start_pos={start_pos}" if start_pos != 0 else "")))
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             log.error(f"play called with no sound selected nor playing")
             return
@@ -564,7 +564,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.play(start_pos)
 
     def pause(self):
-        log.debug(brightcyan(f"pause {self}"))
+        log.debug(brightcyan(f"PAUSE"))
         if not self.player.player_state == PlayerStates.PLAYING:
             log.error(f"pause called with state = {self.state.name}")
             return
@@ -574,7 +574,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.pause()
 
     def stop(self):
-        log.debug(brightcyan(f"stop {self}"))
+        log.debug(brightcyan(f"STOP"))
         self.player.stop()
         self.seek_slider.setValue(0.0)
 
