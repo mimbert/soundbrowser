@@ -2,8 +2,9 @@ import re, pathlib, enum, threading, time, inspect, types, contextlib
 from lib.logger import log, lightcyan, brightmagenta, lightgreen, brightgreen, lightblue, warmred, log_callstack
 from gi.repository import GObject, Gst, GLib
 
-SLEEP_HACK_TIME = 0 # ugly workaround for gst bug or something i don't
-                    # do correctly (especially with pipewiresink)
+SLEEP_HACK_TIME = 0 # float, in seconds. Ugly workaround for gst bug
+                    # or something i don't do correctly (especially
+                    # with pipewiresink)
 
 class PlayerStates(enum.Enum):
     UNKNOWN = 0
