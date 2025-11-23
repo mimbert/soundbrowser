@@ -17,6 +17,7 @@ class PlayerMessages(enum.Enum):
     ASK_STOP = 1
     ASK_PAUSE = 2
     ASK_PLAY = 3
+    WAKE_UP = 4
 
 # ------------------------------------------------------------------------
 # gst config
@@ -362,6 +363,20 @@ class SoundPlayer():
                 log.warn(f"unable to seek, because got_duration={got_duration} got_position={got_position}")
 
     # ------------------------------------------------------------------------
+    # query seeking
+
+    def _query_seeking(self):
+        seek_query = Gst.Query.new_seeking(Gst.Format.TIME)
+        seek_query_retval = self.gst_player.query(seek_query)
+        if seek_query_retval:
+            seek_query_answer = seek_query.parse_seeking()
+            log.debug(warmred(f"query seeking returned seek_query_answer={seek_query_answer}"))
+            return seek_query_answer # format, seekable, segment_start, segment_end
+        else:
+            log.debug(warmred(f"query seeking failed seek_query_retval={seek_query_retval}"))
+            return None
+
+    # ------------------------------------------------------------------------
     # gst messages / player messages utils
 
     def log_gst_message(self, gst_message):
@@ -387,18 +402,20 @@ class SoundPlayer():
         self.bus.post(gst_message)
 
     # ------------------------------------------------------------------------
-    # query seeking
+    # async utils
 
-    # def _query_seeking(self):
-    #     seek_query = Gst.Query.new_seeking(Gst.Format.TIME)
-    #     seek_query_retval = self.gst_player.query(seek_query)
-    #     if seek_query_retval:
-    #         seek_query_answer = seek_query.parse_seeking()
-    #         log.debug(warmred(f"query seeking returned seek_query_answer={seek_query_answer}"))
-    #         return seek_query_answer
-    #     else:
-    #         log.debug(warmred(f"query seeking failed seek_query_retval={seek_query_retval}"))
-    #         return None
+    def _wait(self, delay): # float seconds
+        log.debug(warmred(f"create wait thread for {delay}s"))
+        def wait_delay():
+            log.debug(warmred(f"sleep {delay}s"))
+            time.sleep(delay)
+            log.debug(warmred(f"post wakeup"))
+            self.post_player_message(PlayerMessages.WAKE_UP)
+        threading.Thread(target=wait_delay).start()
+        args = yield None
+        while args.player_msg != PlayerMessages.WAKE_UP:
+            args = yield None
+        log.debug(warmred(f"waking up"))
 
     # ------------------------------------------------------------------------
     # gst async utils
@@ -552,7 +569,7 @@ class SoundPlayer():
         ),
         PlayerStates.STOPPED: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, ),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, PlayerMessages.WAKE_UP),
                 Gst.MessageType.ASYNC_DONE: None,
             },
             _stopped_state_transition_handler
