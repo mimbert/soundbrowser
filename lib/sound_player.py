@@ -249,12 +249,6 @@ class SoundPlayer():
             Gst.SeekFlags.ACCURATE | Gst.SeekFlags.SEGMENT,
             Gst.SeekType.SET, 0,
             Gst.SeekType.END, 0)
-        # self.reset_loop_seek = Gst.Event.new_seek(
-        #     self.playback_rate,
-        #     Gst.Format.TIME,
-        #     Gst.SeekFlags.ACCURATE | Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-        #     Gst.SeekType.SET, 0,
-        #     Gst.SeekType.END, 0)
 
     # ------------------------------------------------------------------------
     # callbacks
@@ -398,7 +392,7 @@ class SoundPlayer():
             None,
             gst_message_structure)
         # MAYBE TODO: puy self.bus.post(message) in a wait cond var to
-        # be sure to "see" the state change (in case it's too false)
+        # be sure to "see" the state change (in case it's too fast)
         log.debug(f"sending player message {dump_player_message(gst_message)}")
         self.bus.post(gst_message)
 
@@ -459,12 +453,6 @@ class SoundPlayer():
         # disable video, subtitles, visualisation
         log.debug(f"set flags of gst player to 0x{flags:08x}")
         self.gst_player.set_property('flags', flags)
-        # following 4 lines not needed anymore: the gst state
-        # corresponding to player state paused is gst_ready
-        # log.debug(lightgreen(f"set gst state to PAUSED"))
-        # state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
-        # yield from self._wait_gst_state_change(state_change_retval)
-        # yield from self._send_seek(self.reset_seek)
         yield next_state
 
     # ------------------------------------------------------------------------
@@ -484,18 +472,10 @@ class SoundPlayer():
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
         elif args.player_msg == PlayerMessages.ASK_PLAY:
             start_pos = args.gst_msg.get_structure().get_value('start_pos')
+
             log.debug(lightgreen(f"set gst state to PAUSED"))
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_gst_state_change(state_change_retval)
-
-            # following code does not work for looping because the
-            # reset loop seek fails to allow getting duration for some
-            # sound and the segment flags of this seek does not work
-            # correctly
-            # if self.loop:
-            #     yield from self._send_seek(self.reset_loop_seek)
-            # else:
-            #     yield from self._send_seek(self.reset_seek)
 
             # need a reset seek to
             # - init playback rate
@@ -624,18 +604,6 @@ class SoundPlayer():
             while self.player_state not in player_states:
                 with self._player_state_change_cv:
                     self._player_state_change_cv.wait()
-                    # est-ce que je met le whith CV autour du while ou
-                    # à l'intérieur du while?  que se passe t-il si
-                    # par exemple le state passe de paused à
-                    # paused_seeking, mais que le seeking va tellement
-                    # vite qu'il repasse immédiatement à paused avant
-                    # que le wait_player_state soit appelé?  ou alors
-                    # ne pas attendre l'état du player et juste
-                    # envoyer des events. Mais je risque d'envoyer le
-                    # seek avant la completion d'autre chose ou alors
-                    # j'envoie juste un event play et c'est dans le
-                    # message handler que j'implémente toute la
-                    # mécanique
 
     def __change_player_state(self, new_state):
         with self._player_state_change_cv:
