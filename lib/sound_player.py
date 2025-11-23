@@ -483,40 +483,52 @@ class SoundPlayer():
         if args.player_msg == PlayerMessages.SET_URI:
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
         elif args.player_msg == PlayerMessages.ASK_PLAY:
+            start_pos = args.gst_msg.get_structure().get_value('start_pos')
             log.debug(lightgreen(f"set gst state to PAUSED"))
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_gst_state_change(state_change_retval)
-            # first reset seek, needed to set playback rate and to
-            # make sure it's possible to get the duration needed for
-            # the potential seek to start_pos: query_duration fails
-            # for some sounds without this reset seek
+
+            # following code does not work for looping because the
+            # reset loop seek fails to allow getting duration for some
+            # sound and the segment flags of this seek does not work
+            # correctly
             # if self.loop:
             #     yield from self._send_seek(self.reset_loop_seek)
             # else:
             #     yield from self._send_seek(self.reset_seek)
+
+            # need a reset seek to
+            # - init playback rate
+            # - in case of playing from a start position > 0, allow
+            #   getting reliably the duration of the sound which is
+            #   needed to do the position seek just after
+            # - in case of looping, allow getting reliably the
+            #   duration of the sound which is needed to do a segment
+            #   seek just after
+            # (getting duration without an appropriate reset seek
+            # fails for some sounds)
             yield from self._send_seek(self.reset_seek)
-            start_pos = args.gst_msg.get_structure().get_value('start_pos')
-            # if start_pos != 0:
-            if True:
-                got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
-                if got_duration:
-                    if self.loop:
-                        seek = Gst.Event.new_seek(
-                            self.playback_rate,
-                            Gst.Format.TIME,
-                            Gst.SeekFlags.ACCURATE | Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
-                            Gst.SeekType.SET, start_pos * duration,
-                            Gst.SeekType.SET, duration)
-                    else:
-                        seek = Gst.Event.new_seek(
-                            self.playback_rate,
-                            Gst.Format.TIME,
-                            Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
-                            Gst.SeekType.SET, start_pos * duration,
-                            Gst.SeekType.SET, duration)
-                    yield from self._send_seek(seek)
+            got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
+            if got_duration:
+                log.debug(warmred(f"duration={duration}"))
+                if self.loop:
+                    seek = Gst.Event.new_seek(
+                        self.playback_rate,
+                        Gst.Format.TIME,
+                        Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+                        Gst.SeekType.SET, start_pos * duration,
+                        Gst.SeekType.SET, duration)
                 else:
-                    log.warn(f"unable to seek, because unable to get sound duration")
+                    seek = Gst.Event.new_seek(
+                        self.playback_rate,
+                        Gst.Format.TIME,
+                        Gst.SeekFlags.FLUSH,
+                        Gst.SeekType.SET, start_pos * duration,
+                        Gst.SeekType.SET, duration)
+                yield from self._send_seek(seek)
+            else:
+                log.warn(f"unable to perform initial seek, because unable to get sound duration")
+
             log.debug(lightgreen(f"set gst state to PLAYING"))
             state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
             yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
