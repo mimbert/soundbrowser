@@ -242,7 +242,7 @@ class SoundPlayer():
             Gst.Format.TIME,
             Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
             Gst.SeekType.SET, 0,
-            Gst.SeekType.NONE, 0)
+            Gst.SeekType.NONE, -1)
         self.loop_seek = Gst.Event.new_seek(
             self.playback_rate,
             Gst.Format.TIME,
