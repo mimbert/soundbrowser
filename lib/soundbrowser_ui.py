@@ -3,7 +3,7 @@ from lib.config import config, save_conf, STARTUP_PATH_MODE_SPECIFIED_PATH, STAR
 from lib.utils import split_path_filename, format_duration
 from lib.sound_player import SoundPlayer, PlayerStates
 from lib.sound_manager import SoundManager
-from lib.logger import log, brightcyan, warmyellow
+from lib.logger import log, brightcyan, warmred
 from PySide2 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
 from lib.ui_utils import set_pixmap, set_dark_theme, SbQFileSystemModel, SbQSortFilterProxyModel
@@ -493,7 +493,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         return self.seek_slider.orig_mouseMoveEvent(mouse_event)
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        log.debug(warmyellow(f"slider_mouseReleaseEvent pos={self.get_slider_pos(mouse_event)}"))
+        log.debug(warmred(f"slider_mouseReleaseEvent pos={self.get_slider_pos(mouse_event)}"))
         self.seek_slider.setValue(self.get_slider_pos(mouse_event))
         if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
             self.seek(self.get_slider_pos(mouse_event) / 100.0)
@@ -525,13 +525,13 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def enable_seek_pos_updates(self):
-        log.debug(warmyellow(f"enable seek pos updates"))
+        log.debug(warmred(f"enable seek pos updates"))
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
 
     @QtCore.Slot()
     def disable_seek_pos_updates(self):
-        log.debug(warmyellow(f"disable seek pos updates"))
+        log.debug(warmred(f"disable seek pos updates"))
         self.seek_pos_update_timer.stop()
 
     @QtCore.Slot()
@@ -562,15 +562,17 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         log.debug(brightcyan(f"PLAY" + (f" start_pos={start_pos}" if start_pos != 0 else "")))
         if (not self.current_sound_selected) and (not self.current_sound_playing):
             log.error(f"play called with no sound selected nor playing")
-            return
-        if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
+        elif self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
             self.player.stop()
-        if self.current_sound_selected and self.current_sound_playing != self.current_sound_selected:
             self.player.set_path(self.current_sound_selected.path)
             self.current_sound_playing = self.current_sound_selected
+            self.player.play(start_pos)
         elif self.current_sound_playing.file_changed():
+            self.player.stop()
             self.player.set_path(self.current_sound_playing.path)
-        self.player.play(start_pos)
+            self.player.play(start_pos)
+        else:
+            self.player.play(start_pos)
 
     def pause(self):
         log.debug(brightcyan(f"PAUSE"))

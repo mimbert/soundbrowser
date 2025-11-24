@@ -1,5 +1,5 @@
 import re, pathlib, enum, threading, time, inspect, types, contextlib
-from lib.logger import log, lightcyan, brightmagenta, lightgreen, brightgreen, lightblue, warmred, log_callstack
+from lib.logger import log, lightcyan, brightmagenta, lightgreen, brightgreen, lightblue, warmyellow, log_callstack
 from gi.repository import GObject, Gst, GLib
 
 SLEEP_HACK_TIME = 0 # float, in seconds. Ugly workaround for gst bug
@@ -416,10 +416,10 @@ class SoundPlayer():
         seek_query_retval = self.gst_player.query(seek_query)
         if seek_query_retval:
             seek_query_answer = seek_query.parse_seeking()
-            log.debug(warmred(f"query seeking returned seek_query_answer={seek_query_answer}"))
+            log.debug(warmyellow(f"query seeking returned seek_query_answer={seek_query_answer}"))
             return seek_query_answer # format, seekable, segment_start, segment_end
         else:
-            log.debug(warmred(f"query seeking failed seek_query_retval={seek_query_retval}"))
+            log.debug(warmyellow(f"query seeking failed seek_query_retval={seek_query_retval}"))
             return None
 
     # ------------------------------------------------------------------------
@@ -451,17 +451,17 @@ class SoundPlayer():
     # async utils
 
     def _wait(self, delay): # float seconds
-        log.debug(warmred(f"create wait thread for {delay}s"))
+        log.debug(warmyellow(f"create wait thread for {delay}s"))
         def wait_delay():
-            log.debug(warmred(f"sleep {delay}s"))
+            log.debug(warmyellow(f"sleep {delay}s"))
             time.sleep(delay)
-            log.debug(warmred(f"post wakeup"))
+            log.debug(warmyellow(f"post wakeup"))
             self.post_player_message(PlayerMessages.WAKE_UP)
         threading.Thread(target=wait_delay).start()
         args = yield None
         while args.player_msg != PlayerMessages.WAKE_UP:
             args = yield None
-        log.debug(warmred(f"waking up"))
+        log.debug(warmyellow(f"waking up"))
 
     # ------------------------------------------------------------------------
     # gst async utils
@@ -503,7 +503,7 @@ class SoundPlayer():
         yield next_state
 
     def _reset(self):
-        log.debug(warmred(f"reset gst player"))
+        log.debug(warmyellow(f"reset gst player"))
         log.debug(lightgreen(f"set gst state to READY"))
         state_change_retval = self.gst_player.set_state(Gst.State.READY)
         yield from self._wait_gst_state_change(state_change_retval)
@@ -551,7 +551,7 @@ class SoundPlayer():
             yield from self._send_seek(self.reset_seek)
             got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
             if got_duration:
-                log.debug(warmred(f"duration={duration}"))
+                log.debug(warmyellow(f"duration = {duration}"))
                 if self.loop:
                     seek = Gst.Event.new_seek(
                         self.playback_rate,
@@ -579,7 +579,8 @@ class SoundPlayer():
         args = yield None
         while args.player_msg not in [ PlayerMessages.ASK_PLAY,
                                        PlayerMessages.SET_URI,
-                                       PlayerMessages.RESET ]:
+                                       PlayerMessages.RESET,
+                                       PlayerMessages.ASK_STOP ]:
             args = yield None
         if args.player_msg == PlayerMessages.RESET:
             yield from self._reset()
@@ -590,6 +591,11 @@ class SoundPlayer():
             state_change_retval = self.gst_player.set_state(Gst.State.PLAYING)
             yield from self._wait_gst_state_change(state_change_retval, preroll_is_error=True)
             yield PlayerStates.PLAYING
+        elif args.player_msg == PlayerMessages.ASK_STOP:
+            log.debug(lightgreen(f"set gst state to READY"))
+            state_change_retval = self.gst_player.set_state(Gst.State.READY)
+            yield from self._wait_gst_state_change(state_change_retval)
+            yield PlayerStates.STOPPED
 
     def _playing_state_transition_handler(self):
         args = yield None
@@ -650,6 +656,7 @@ class SoundPlayer():
             {
                 Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY,
                                                PlayerMessages.SET_URI,
+                                               PlayerMessages.ASK_STOP,
                                                PlayerMessages.RESET ),
                 Gst.MessageType.ASYNC_DONE: None,
             },
@@ -685,10 +692,12 @@ class SoundPlayer():
         log_callstack()
 
     def wait_player_state(self, player_states):
+        log.debug(warmyellow(f"current state = {self.player_state.name}, wait for state to be in {[ s.name for s in player_states ]}"))
         if threading.current_thread() != self._bus_watch_thread and self._bus_watch_thread != None:
             while self.player_state not in player_states:
                 with self._player_state_change_cv:
                     self._player_state_change_cv.wait()
+        log.debug(warmyellow(f"wait finished, current state = {self.player_state.name}"))
 
     def __change_player_state(self, new_state):
         with self._player_state_change_cv:
@@ -745,6 +754,7 @@ class SoundPlayer():
     # public interface
 
     def set_path(self, path):
+        log.debug(warmyellow(f"set_path path={path}"))
         with self._lock:
             uri = pathlib.Path(path).as_uri()
             self.post_player_message(PlayerMessages.SET_URI, uri=uri)
@@ -754,6 +764,7 @@ class SoundPlayer():
 
     def play(self, start_pos=0):
         # 0 <= start_pos <= 1.0
+        log.debug(warmyellow(f"play start_pos={start_pos}"))
         with self._lock:
             self.post_player_message(PlayerMessages.ASK_PLAY, start_pos=start_pos)
             self.wait_player_state((PlayerStates.PLAYING, PlayerStates.ERROR))
@@ -761,6 +772,7 @@ class SoundPlayer():
                 time.sleep(SLEEP_HACK_TIME)
 
     def pause(self):
+        log.debug(warmyellow(f"pause"))
         with self._lock:
             self.post_player_message(PlayerMessages.ASK_PAUSE)
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
@@ -768,6 +780,7 @@ class SoundPlayer():
                 time.sleep(SLEEP_HACK_TIME)
 
     def stop(self):
+        log.debug(warmyellow(f"stop"))
         with self._lock:
             self.post_player_message(PlayerMessages.ASK_STOP)
             self.wait_player_state((PlayerStates.UNKNOWN, PlayerStates.STOPPED, PlayerStates.ERROR))
@@ -775,6 +788,7 @@ class SoundPlayer():
                 time.sleep(SLEEP_HACK_TIME)
 
     def reset(self):
+        log.debug(warmyellow(f"reset"))
         with self._lock:
             self.post_player_message(PlayerMessages.RESET)
             self.wait_player_state((PlayerStates.UNKNOWN, PlayerStates.ERROR))
@@ -783,6 +797,7 @@ class SoundPlayer():
 
     def seek(self, seek_pos):
         # 0 <= seek_pos <= 1.0
+        log.debug(warmyellow(f"seek seek_pos={seek_pos}"))
         got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
         if got_duration:
             seek = Gst.Event.new_seek(
