@@ -19,6 +19,7 @@ class PlayerMessages(enum.Enum):
     ASK_PAUSE = 2
     ASK_PLAY = 3
     WAKE_UP = 4
+    RESET = 5
 
 # ------------------------------------------------------------------------
 # gst config
@@ -217,22 +218,70 @@ def get_semitone_ratio(semitones):
 
 # ------------------------------------------------------------------------
 # the core sound player
-
 class SoundPlayer():
 
     def __init__(self):
+        self.gst_bus_thread = None
         self._lock = threading.Lock()
         self._player_state_change_cv = threading.Condition()
-        self._bus_wath_thread = None
+        self._bus_watch_thread = None
         self.metadata_callback = None
         self.state_change_callback = None
         self.__change_player_state(PlayerStates.UNKNOWN)
-        self.gst_player = Gst.ElementFactory.make('playbin')
-        self.bus = self.gst_player.get_bus()
-        self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
+        self.create_gst_player()
         self._semitone = 0
         self.loop = False
         self.create_seeks()
+
+    def clean_close(self):
+        self.stop()
+        self.reset()
+        self.stop_gst_bus_thread()
+
+    def __on_pad_added(self, element, pad):
+        sink_pad = self.audioconvert.get_static_pad("sink")
+        if not sink_pad.is_linked():
+            pad.link(sink_pad)
+
+    def create_gst_player(self, sink_instance=None):
+        self.stop_gst_bus_thread()
+        self.decodebin = Gst.ElementFactory.make('uridecodebin', 'decoder')
+        self.audioconvert = Gst.ElementFactory.make('audioconvert', 'converter')
+        self.audioresample = Gst.ElementFactory.make('audioresample', 'resampler')
+        if sink_instance:
+            self.sink = sink_instance
+        else:
+            self.sink = Gst.ElementFactory.make('autoaudiosink', 'sink')
+        self.gst_player = Gst.Pipeline.new('player')
+        self.gst_player.add(self.decodebin)
+        self.gst_player.add(self.audioconvert)
+        self.gst_player.add(self.audioresample)
+        self.gst_player.add(self.sink)
+        self.audioresample.link(self.sink)
+        self.audioconvert.link(self.audioresample)
+        self.decodebin.connect('pad-added', self.__on_pad_added)
+        self.bus = self.gst_player.get_bus()
+        self.start_gst_bus_thread()
+
+    def gst_bus_run(self):
+        try:
+            self.glib_context = GLib.MainContext()
+            self.glib_context.push_thread_default()
+            self.glib_loop = GLib.MainLoop(self.glib_context)
+            self.bus_watch_source_id = self.bus.add_watch(GLib.PRIORITY_DEFAULT, self._gst_bus_message_handler, None)
+            self.glib_loop.run()
+        finally:
+            self.glib_context.pop_thread_default()
+
+    def start_gst_bus_thread(self):
+        self.gst_bus_thread = threading.Thread(target=self.gst_bus_run)
+        self.gst_bus_thread.start()
+
+    def stop_gst_bus_thread(self):
+        if self.gst_bus_thread:
+            self.bus.remove_watch()
+            self.glib_loop.quit()
+            self.gst_bus_thread.join()
 
     def create_seeks(self):
         # seeks need to be preallocated in the main thread, because
@@ -271,6 +320,8 @@ class SoundPlayer():
     # output sink config
 
     def configure_audio_output(self, gst_sink_factory_name, gst_sink_properties):
+        self.stop()
+        self.reset()
         if not gst_sink_properties:
             gst_sink_properties = {}
         available_gst_audio_sink_factories = get_available_gst_audio_sink_factories()
@@ -289,7 +340,7 @@ class SoundPlayer():
                     log.info(f"unavailable property '{prop_name}' for gst sink '{gst_sink_factory_name}'")
                     del gst_sink_properties[prop_name]
             log.debug(f"instanciate gst sink '{gst_sink_factory_name}'")
-            gst_sink_instance = Gst.ElementFactory.make(gst_sink_factory_name)
+            gst_sink_instance = Gst.ElementFactory.make(gst_sink_factory_name, 'sink')
             for prop_name, prop_value in list(gst_sink_properties.items()):
                 try:
                     pytype_prop_value = _cast_str_to_prop_pytype(available_properties[prop_name]['property'], prop_value)
@@ -299,19 +350,19 @@ class SoundPlayer():
                     log.error(f"gst sink '{gst_sink_factory_name}': unable to set property '{prop_name}' to value '{pytype_prop_value}'")
                     del gst_sink_properties[prop_name]
             try:
-                self.gst_player.set_property("audio-sink", gst_sink_instance)
-                log.debug(f"gst playbin: set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
+                self.create_gst_player(gst_sink_instance)
+                log.debug(f"gst player: set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
                 return True, gst_sink_factory_name, gst_sink_properties
             except:
-                log.error(f"gst playbin: unable to set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
+                log.error(f"gst player: unable to set audiosink to '{gst_sink_factory_name}' / {gst_sink_instance}")
                 return False, gst_sink_factory_name, gst_sink_properties
         else:
             try:
-                self.gst_player.set_property("audio-sink", None)
-                log.debug(f"gst playbin: set audiosink to None (default, auto-selected)")
+                self.create_gst_player()
+                log.debug(f"gst player: set audiosink to None (default, autoaudiosink)")
                 return True, gst_sink_factory_name, {}
             except:
-                log.error(f"gst playbin: unable to set audiosink to None (default, auto-selected)")
+                log.error(f"gst player: unable to set audiosink to None (default, autoaudiosink)")
                 return False, gst_sink_factory_name, gst_sink_properties
 
     # ------------------------------------------------------------------------
@@ -448,12 +499,18 @@ class SoundPlayer():
         state_change_retval = self.gst_player.set_state(Gst.State.READY)
         yield from self._wait_gst_state_change(state_change_retval)
         log.debug(f"set property uri of gst player to '{uri}'")
-        self.gst_player.set_property('uri', uri)
-        flags = self.gst_player.get_property('flags') & ~(0x00000001 | 0x00000004 | 0x00000008)
-        # disable video, subtitles, visualisation
-        log.debug(f"set flags of gst player to 0x{flags:08x}")
-        self.gst_player.set_property('flags', flags)
+        self.decodebin.set_property('uri', uri)
         yield next_state
+
+    def _reset(self):
+        log.debug(warmred(f"reset gst player"))
+        log.debug(lightgreen(f"set gst state to READY"))
+        state_change_retval = self.gst_player.set_state(Gst.State.READY)
+        yield from self._wait_gst_state_change(state_change_retval)
+        log.debug(lightgreen(f"set gst state to NULL"))
+        state_change_retval = self.gst_player.set_state(Gst.State.NULL)
+        yield from self._wait_gst_state_change(state_change_retval)
+        yield PlayerStates.UNKNOWN
 
     # ------------------------------------------------------------------------
     # player state transition handlers
@@ -466,9 +523,13 @@ class SoundPlayer():
 
     def _stopped_state_transition_handler(self):
         args = yield None
-        while args.player_msg not in [ PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI ]:
+        while args.player_msg not in [ PlayerMessages.ASK_PLAY,
+                                       PlayerMessages.SET_URI,
+                                       PlayerMessages.RESET ]:
             args = yield None
-        if args.player_msg == PlayerMessages.SET_URI:
+        if args.player_msg == PlayerMessages.RESET:
+            yield from self._reset()
+        elif args.player_msg == PlayerMessages.SET_URI:
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
         elif args.player_msg == PlayerMessages.ASK_PLAY:
             start_pos = args.gst_msg.get_structure().get_value('start_pos')
@@ -516,9 +577,13 @@ class SoundPlayer():
 
     def _paused_state_transition_handler(self):
         args = yield None
-        while args.player_msg not in [ PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI ]:
+        while args.player_msg not in [ PlayerMessages.ASK_PLAY,
+                                       PlayerMessages.SET_URI,
+                                       PlayerMessages.RESET ]:
             args = yield None
-        if args.player_msg == PlayerMessages.SET_URI:
+        if args.player_msg == PlayerMessages.RESET:
+            yield from self._reset()
+        elif args.player_msg == PlayerMessages.SET_URI:
             yield from self._set_uri(args.gst_msg.get_structure().get_value('uri'), PlayerStates.STOPPED)
         elif args.player_msg == PlayerMessages.ASK_PLAY:
             log.debug(lightgreen(f"set gst state to PLAYING"))
@@ -528,8 +593,11 @@ class SoundPlayer():
 
     def _playing_state_transition_handler(self):
         args = yield None
-        while not ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE, Gst.MessageType.EOS ]
-                    or args.player_msg in [ PlayerMessages.ASK_PAUSE, PlayerMessages.ASK_STOP ] ):
+        while not ( args.gst_msg.type in [ Gst.MessageType.SEGMENT_DONE,
+                                           Gst.MessageType.EOS ]
+                    or args.player_msg in [ PlayerMessages.ASK_PAUSE,
+                                            PlayerMessages.ASK_STOP,
+                                            PlayerMessages.RESET ] ):
             args = yield None
         if self.loop and args.gst_msg.type == Gst.MessageType.SEGMENT_DONE:
             yield from self._send_seek(self.loop_seek)
@@ -541,13 +609,21 @@ class SoundPlayer():
             log.debug(lightgreen(f"set gst state to PAUSED"))
             state_change_retval = self.gst_player.set_state(Gst.State.PAUSED)
             yield from self._wait_gst_state_change(state_change_retval)
-            if args.gst_msg.type == Gst.MessageType.EOS or args.player_msg == PlayerMessages.ASK_STOP:
+            if args.player_msg == PlayerMessages.RESET:
+                yield from self._reset()
+            elif args.gst_msg.type == Gst.MessageType.EOS or args.player_msg == PlayerMessages.ASK_STOP:
                 log.debug(lightgreen(f"set gst state to READY"))
                 state_change_retval = self.gst_player.set_state(Gst.State.READY)
                 yield from self._wait_gst_state_change(state_change_retval)
                 yield PlayerStates.STOPPED
             else:
                 yield PlayerStates.PAUSED
+
+    def _error_state_transition_handler(self):
+        args = yield None
+        while args.player_msg != PlayerMessages.RESET:
+            args = yield None
+        yield from self._reset()
 
     # ------------------------------------------------------------------------
     # player states transitions matrix
@@ -562,21 +638,28 @@ class SoundPlayer():
         ),
         PlayerStates.STOPPED: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, PlayerMessages.WAKE_UP),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY,
+                                               PlayerMessages.SET_URI,
+                                               PlayerMessages.WAKE_UP,
+                                               PlayerMessages.RESET ),
                 Gst.MessageType.ASYNC_DONE: None,
             },
             _stopped_state_transition_handler
         ),
         PlayerStates.PAUSED: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY, PlayerMessages.SET_URI, ),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PLAY,
+                                               PlayerMessages.SET_URI,
+                                               PlayerMessages.RESET ),
                 Gst.MessageType.ASYNC_DONE: None,
             },
             _paused_state_transition_handler
         ),
         PlayerStates.PLAYING: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PAUSE, PlayerMessages.ASK_STOP, ),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.ASK_PAUSE,
+                                               PlayerMessages.ASK_STOP,
+                                               PlayerMessages.RESET ),
                 Gst.MessageType.ASYNC_DONE: None,
                 Gst.MessageType.EOS: None,
                 Gst.MessageType.SEGMENT_DONE: None,
@@ -584,8 +667,10 @@ class SoundPlayer():
             _playing_state_transition_handler
         ),
         PlayerStates.ERROR: (
-            {},
-            _unknown_state_transition_handler
+            {
+                Gst.MessageType.APPLICATION: ( PlayerMessages.RESET ),
+            },
+            _error_state_transition_handler
         ),
     }
 
@@ -600,7 +685,7 @@ class SoundPlayer():
         log_callstack()
 
     def wait_player_state(self, player_states):
-        if threading.current_thread() != self._bus_wath_thread and self._bus_wath_thread != None:
+        if threading.current_thread() != self._bus_watch_thread and self._bus_watch_thread != None:
             while self.player_state not in player_states:
                 with self._player_state_change_cv:
                     self._player_state_change_cv.wait()
@@ -617,8 +702,7 @@ class SoundPlayer():
     # gst bus handler
 
     def _gst_bus_message_handler(self, bus, message, *user_data):
-        if not self._bus_wath_thread:
-            self._bus_wath_thread = threading.current_thread()
+        self._bus_watch_thread = threading.current_thread()
         if log.log_all_gst_messages:
             self.log_gst_message(message)
         if message.type == Gst.MessageType.WARNING:
@@ -660,14 +744,8 @@ class SoundPlayer():
     # ------------------------------------------------------------------------
     # public interface
 
-    def _get_state_change_lock(self):
-        if threading.current_thread() == self._bus_wath_thread or self._bus_wath_thread == None:
-            return contextlib.nullcontext()
-        else:
-            return self._lock
-
     def set_path(self, path):
-        with self._get_state_change_lock():
+        with self._lock:
             uri = pathlib.Path(path).as_uri()
             self.post_player_message(PlayerMessages.SET_URI, uri=uri)
             self.wait_player_state((PlayerStates.STOPPED, PlayerStates.ERROR))
@@ -676,23 +754,30 @@ class SoundPlayer():
 
     def play(self, start_pos=0):
         # 0 <= start_pos <= 1.0
-        with self._get_state_change_lock():
+        with self._lock:
             self.post_player_message(PlayerMessages.ASK_PLAY, start_pos=start_pos)
             self.wait_player_state((PlayerStates.PLAYING, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
     def pause(self):
-        with self._get_state_change_lock():
+        with self._lock:
             self.post_player_message(PlayerMessages.ASK_PAUSE)
             self.wait_player_state((PlayerStates.PAUSED, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
     def stop(self):
-        with self._get_state_change_lock():
+        with self._lock:
             self.post_player_message(PlayerMessages.ASK_STOP)
-            self.wait_player_state((PlayerStates.STOPPED, PlayerStates.ERROR))
+            self.wait_player_state((PlayerStates.UNKNOWN, PlayerStates.STOPPED, PlayerStates.ERROR))
+            if SLEEP_HACK_TIME > 0:
+                time.sleep(SLEEP_HACK_TIME)
+
+    def reset(self):
+        with self._lock:
+            self.post_player_message(PlayerMessages.RESET)
+            self.wait_player_state((PlayerStates.UNKNOWN, PlayerStates.ERROR))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 

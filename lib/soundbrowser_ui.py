@@ -15,6 +15,8 @@ SEEK_MIN_INTERVAL_MS = 200
 class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     update_metadata_to_current_playing_message = QtCore.Signal()
+    enable_seek_pos_updates_signal = QtCore.Signal()
+    disable_seek_pos_updates_signal = QtCore.Signal()
 
     def __init__(self, startup_path, app):
         super().__init__()
@@ -33,6 +35,8 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.seek_min_interval_timer = None
         self.next_seek_pos = None
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
+        self.enable_seek_pos_updates_signal.connect(self.enable_seek_pos_updates)
+        self.disable_seek_pos_updates_signal.connect(self.disable_seek_pos_updates)
 
     def configure_audio_output(self):
         audio_config_success, gst_audio_sink, gst_audio_sink_properties = self.player.configure_audio_output(
@@ -57,7 +61,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def sound_player_state_changed(self, state):
         if state in [ PlayerStates.UNKNOWN, PlayerStates.ERROR, PlayerStates.STOPPED ]:
-            self.disable_seek_pos_updates()
+            self.disable_seek_pos_updates_signal.emit()
             self.play_button.setIcon(self.play_icon)
             self._current_sound_playing = None
             self.update_ui_to_selection()
@@ -65,9 +69,9 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.play_button.setIcon(self.pause_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
-            self.enable_seek_pos_updates()
+            self.enable_seek_pos_updates_signal.emit()
         elif state == PlayerStates.PAUSED:
-            self.disable_seek_pos_updates()
+            self.disable_seek_pos_updates_signal.emit()
             self.play_button.setIcon(self.play_icon)
             self.play_button.setEnabled(True)
             self.stop_button.setEnabled(True)
@@ -76,6 +80,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         return f"SoundBrowserUI <state={self.player.player_state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
 
     def clean_close(self):
+        self.player.clean_close()
         config['main_window_geometry'] = self.saveGeometry().data()
         config['main_window_state'] = self.saveState().data()
         config['splitter_state'] = self.splitter.saveState().data()
@@ -108,6 +113,8 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             self.tune_dial.show()
             self.tune_value.show()
+        self.current_sound_selected = None
+        self.current_sound_playing = None
 
     def populate(self, startup_path):
         set_dark_theme(self.app, config['dark_theme'])
@@ -516,11 +523,13 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.seek_slider.setValue(position * 100.0 / duration)
                 self.seek_slider.blockSignals(signals_blocked)
 
+    @QtCore.Slot()
     def enable_seek_pos_updates(self):
         log.debug(warmyellow(f"enable seek pos updates"))
         self.seek_pos_update_timer.timeout.connect(self.seek_position_updater)
         self.seek_pos_update_timer.start(SEEK_POS_UPDATER_INTERVAL_MS)
 
+    @QtCore.Slot()
     def disable_seek_pos_updates(self):
         log.debug(warmyellow(f"disable seek pos updates"))
         self.seek_pos_update_timer.stop()
