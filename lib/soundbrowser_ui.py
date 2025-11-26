@@ -44,7 +44,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def initial_scrollto_hack(self):
-        log.warn(warmred(f"fired"))
         self.tableView.scrollTo(self.tableView.currentIndex())
         self.treeView.scrollTo(self.treeView.currentIndex())
 
@@ -501,21 +500,28 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def slider_mousePressEvent(self, mouse_event):
         self.disable_seek_pos_updates()
-        return self.seek_slider.orig_mousePressEvent(mouse_event)
+        self.slider_move(mouse_event)
+        return True
 
     def slider_mouseMoveEvent(self, mouse_event):
-        return self.seek_slider.orig_mouseMoveEvent(mouse_event)
+        self.disable_seek_pos_updates()
+        self.slider_move(mouse_event)
+        return True
 
     def slider_mouseReleaseEvent(self, mouse_event):
-        log.debug(warmred(f"slider_mouseReleaseEvent pos={self.get_slider_pos(mouse_event)}"))
-        self.seek_slider.setValue(self.get_slider_pos(mouse_event))
+        self.slider_move(mouse_event)
         if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
-            self.seek(self.get_slider_pos(mouse_event) / 100.0)
             self.enable_seek_pos_updates()
+        return True
+
+    def slider_move(self, mouse_event):
+        slider_value = self.get_slider_pos(mouse_event)
+        self.seek_slider.setValue(slider_value)
+        if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
+            self.seek(slider_value / 100.0)
         else:
             if self.current_sound_selected:
-                self.play(self.get_slider_pos(mouse_event) / 100.0)
-        return True
+                self.play(slider_value / 100.0)
 
     @QtCore.Slot()
     def tune_dial_valueChanged(self, value):
@@ -559,7 +565,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         # 0 <= seek_pos <= 1.0
         if self.seek_min_interval_timer != None:
             log.debug(f"seek to {seek_pos} delayed to limit gst seek events frequency")
-            self.next_seek_pos = position
+            self.next_seek_pos = seek_pos
         else:
             self.player.seek(seek_pos)
             self.next_seek_pos = None
