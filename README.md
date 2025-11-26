@@ -80,14 +80,6 @@ with the format. if a field is missing, it will be added. If a field
 is unknown, it will cause an error. Note that *Soundbrowser* writes this
 file on exit, so if you need to edit it, quit *Soundbrowser* before.
 
-## TODO
-
-* fix seek pos at stop (depending on stop cause -> 0 or force 100%)
-
-* add counter and reorg slider ui
-
-* qt6
-
 ## Motivations and goals
 
 * browse filesystem with one-click playing of sound files
