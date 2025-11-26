@@ -298,6 +298,12 @@ class SoundPlayer():
             Gst.SeekFlags.ACCURATE | Gst.SeekFlags.SEGMENT,
             Gst.SeekType.SET, 0,
             Gst.SeekType.END, 0)
+        self.reset_loop_seek = Gst.Event.new_seek(
+            self.playback_rate,
+            Gst.Format.TIME,
+            Gst.SeekFlags.ACCURATE | Gst.SeekFlags.SEGMENT | Gst.SeekFlags.FLUSH,
+            Gst.SeekType.SET, 0,
+            Gst.SeekType.END, 0)
 
     # ------------------------------------------------------------------------
     # callbacks
@@ -609,7 +615,7 @@ class SoundPlayer():
             yield from self._send_seek(self.loop_seek)
             yield PlayerStates.PLAYING
         elif self.loop and args.gst_msg.type == Gst.MessageType.EOS:
-            yield from self._send_seek(self.reset_seek)
+            yield from self._send_seek(self.reset_loop_seek)
             yield PlayerStates.PLAYING
         else:
             log.debug(lightgreen(f"set gst state to PAUSED"))
