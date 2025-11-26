@@ -82,9 +82,11 @@ file on exit, so if you need to edit it, quit *Soundbrowser* before.
 
 ## TODO
 
-* fix looping
+* fix looping after seeking
 
-* fix seek pos at stop (depending on stop cause)
+* fix seek pos at stop (depending on stop cause -> 0 or force 100%)
+
+* add counter and reorg slider ui
 
 * qt6
 

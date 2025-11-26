@@ -88,8 +88,22 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def __str__(self):
         return f"SoundBrowserUI <state={self.player.player_state.name}, current_sound_selected={self.current_sound_selected} current_sound_playing={self.current_sound_playing}>"
 
+    def save_treeview_state(self):
+        expanded_pathes = []
+        for qmi in self.fs_model.persistentIndexList():
+            if self.treeView.isExpanded(qmi):
+                expanded_pathes.append(self.fs_model.filePath(qmi))
+        return expanded_pathes
+
+    def restore_treeview_state(self, expanded_pathes):
+        for path in expanded_pathes:
+            qmi = self.fs_model.index(path)
+            if qmi and qmi.isValid():
+                self.treeView.expand(qmi)
+
     def clean_close(self):
         self.player.clean_close()
+        config['treeview_state'] = self.save_treeview_state()
         config['main_window_geometry'] = self.saveGeometry().data()
         config['main_window_state'] = self.saveState().data()
         config['splitter_state'] = self.splitter.saveState().data()
@@ -197,6 +211,8 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.restoreState(QtCore.QByteArray(config['main_window_state']))
         if config['splitter_state']:
             self.splitter.restoreState(QtCore.QByteArray(config['splitter_state']))
+        if config['treeview_state']:
+            self.restore_treeview_state(config['treeview_state'])
         self.tableView_contextMenu = QtWidgets.QMenu(self.tableView)
         reload_sound_action = QtWidgets.QAction("Reload", self.tableView)
         self.tableView_contextMenu.addAction(reload_sound_action)

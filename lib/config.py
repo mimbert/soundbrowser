@@ -19,6 +19,7 @@ conf_schema = schema.Schema({
     schema.Optional('autoplay_keyboard', default=False): bool,
     schema.Optional('main_window_geometry', default=None): bytes,
     schema.Optional('main_window_state', default=None): bytes,
+    schema.Optional('treeview_state', default=None): [str],
     schema.Optional('splitter_state', default=None): bytes,
     schema.Optional('play_looped', default=False): bool,
     schema.Optional('hide_tune', default=True): bool,
