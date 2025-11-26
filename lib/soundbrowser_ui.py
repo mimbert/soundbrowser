@@ -167,7 +167,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.treeView.setSortingEnabled(True)
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
-        self.fs_model.directoryLoaded.connect(self.fs_model_directory_loaded)
         self.locationBar.returnPressed.connect(self.locationBar_return_pressed)
         self.prefs_button.clicked.connect(self.prefs_button_clicked)
         self.seek_slider.orig_mousePressEvent = self.seek_slider.mousePressEvent
@@ -345,16 +344,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def dir_model_directory_loaded(self, path):
-        log.debug(warmred(f"dir_model_directory_loaded: path='{path}'"))
         self.tableView.resizeColumnToContents(0)
-        self.tableView.scrollToBottom()
-        self.tableView.scrollTo(self.tableView.currentIndex())
-
-    @QtCore.Slot()
-    def fs_model_directory_loaded(self, path):
-        log.debug(warmred(f"fs_model_directory_loaded: path='{path}'"))
-        self.treeView.scrollTo(self.treeView.currentIndex())
-        self.treeView.expand(self.treeView.currentIndex())
 
     @QtCore.Slot()
     def treeview_selection_changed(self, selected, deselected):
