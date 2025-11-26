@@ -37,6 +37,16 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
         self.enable_seek_pos_updates_signal.connect(self.enable_seek_pos_updates)
         self.disable_seek_pos_updates_signal.connect(self.disable_seek_pos_updates)
+        self.initial_scrollto_timer = QtCore.QTimer()
+        self.initial_scrollto_timer.setSingleShot(True)
+        self.initial_scrollto_timer.timeout.connect(self.initial_scrollto_hack)
+        self.initial_scrollto_timer.start(200)
+
+    @QtCore.Slot()
+    def initial_scrollto_hack(self):
+        log.warn(warmred(f"fired"))
+        self.tableView.scrollTo(self.tableView.currentIndex())
+        self.treeView.scrollTo(self.treeView.currentIndex())
 
     def configure_audio_output(self):
         audio_config_success, gst_audio_sink, gst_audio_sink_properties = self.player.configure_audio_output(
@@ -113,8 +123,6 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         else:
             self.tune_dial.show()
             self.tune_value.show()
-        self.current_sound_selected = None
-        self.current_sound_playing = None
 
     def populate(self, startup_path):
         set_dark_theme(self.app, config['dark_theme'])
@@ -156,11 +164,11 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 startup_path = os.getcwd()
             elif config['startup_path_mode'] == STARTUP_PATH_MODE_HOME_DIR:
                 startup_path = os.path.expanduser('~')
-        self.goto_path(startup_path)
         self.treeView.header().setSortIndicator(0,QtCore.Qt.AscendingOrder)
         self.treeView.setSortingEnabled(True)
         self.treeView.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.dir_model.directoryLoaded.connect(self.dir_model_directory_loaded)
+        self.fs_model.directoryLoaded.connect(self.fs_model_directory_loaded)
         self.locationBar.returnPressed.connect(self.locationBar_return_pressed)
         self.prefs_button.clicked.connect(self.prefs_button_clicked)
         self.seek_slider.orig_mousePressEvent = self.seek_slider.mousePressEvent
@@ -226,6 +234,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tableView.setFocus()
         self.player.semitone = int(self.tune_value.text())
         self.player.loop = self.loop_button.isChecked()
+        self.goto_path(startup_path)
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
@@ -246,31 +255,27 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         if directory:
             self.treeView.setCurrentIndex(self.fs_model.index(directory))
             self.treeView.expand(self.fs_model.index(directory))
+            self.treeView.scrollTo(self.fs_model.index(directory))
             config['last_path'] = directory
             if filename:
                 self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(directory)))
                 self.tableView.selectRow(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)).row())
+                fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+                previous_current_sound_selected = self.current_sound_selected
+                self.current_sound_selected = self.manager.get(path)
+                if self.current_sound_selected != previous_current_sound_selected:
+                    if config['reset_tune_between_sounds']:
+                        self.tune_dial.setValue(0)
+                if self.current_sound_selected:
+                    self.update_metadata_pane(self.current_sound_selected.metadata)
+                else:
+                    self.clear_metadata_pane()
+                self.tableView.scrollTo(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
                 config['last_path'] = path
-
-    def select_path(self):
-        fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
-        filepath = self.tableview_get_path(self.tableView.currentIndex())
-        self.locationBar.setText(filepath)
-        if fileinfo.isFile():
-            previous_current_sound_selected = self.current_sound_selected
-            self.current_sound_selected = self.manager.get(filepath)
-            if self.current_sound_selected != previous_current_sound_selected:
-                if config['reset_tune_between_sounds']:
-                    self.tune_dial.setValue(0)
-            if self.current_sound_selected:
-                self.update_metadata_pane(self.current_sound_selected.metadata)
             else:
-                self.clear_metadata_pane()
+                self.current_sound_selected = None
         else:
             self.current_sound_selected = None
-        if self.player.player_state == PlayerStates.STOPPED:
-            self.update_ui_to_selection()
-            self.seek_slider.setValue(0)
 
     def update_metadata_field(self, field, value, force = None):
         f = getattr(self, field)
@@ -341,7 +346,16 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def dir_model_directory_loaded(self, path):
+        log.debug(warmred(f"dir_model_directory_loaded: path='{path}'"))
         self.tableView.resizeColumnToContents(0)
+        self.tableView.scrollToBottom()
+        self.tableView.scrollTo(self.tableView.currentIndex())
+
+    @QtCore.Slot()
+    def fs_model_directory_loaded(self, path):
+        log.debug(warmred(f"fs_model_directory_loaded: path='{path}'"))
+        self.treeView.scrollTo(self.treeView.currentIndex())
+        self.treeView.expand(self.treeView.currentIndex())
 
     @QtCore.Slot()
     def treeview_selection_changed(self, selected, deselected):
@@ -357,7 +371,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def tableview_selection_changed(self, selected, deselected):
         if len(selected) == 1:
-            self.select_path()
+            self.goto_path(self.tableview_get_path(self.tableView.currentIndex()))
         if self.in_keyboard_press_event and config['autoplay_keyboard']:
             self.tableView_return_pressed(change_dir=False)
 
@@ -369,7 +383,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def tableView_return_pressed(self, change_dir=True):
         if len(self.tableView.selectionModel().selectedRows()) == 1:
-            self.select_path()
+            self.goto_path(self.tableview_get_path(self.tableView.currentIndex()))
             fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
             if fileinfo.isDir() and change_dir:
                 path = self.tableview_get_path(self.tableView.currentIndex())
