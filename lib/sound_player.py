@@ -681,7 +681,7 @@ class SoundPlayer():
         ),
         PlayerStates.ERROR: (
             {
-                Gst.MessageType.APPLICATION: ( PlayerMessages.RESET ),
+                Gst.MessageType.APPLICATION: ( PlayerMessages.RESET, ),
             },
             _error_state_transition_handler
         ),
