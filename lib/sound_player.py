@@ -806,12 +806,20 @@ class SoundPlayer():
         log.debug(warmyellow(f"seek seek_pos={seek_pos}"))
         got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
         if got_duration:
-            seek = Gst.Event.new_seek(
-                self.playback_rate,
-                Gst.Format.TIME,
-                Gst.SeekFlags.ACCURATE | Gst.SeekFlags.FLUSH,
-                Gst.SeekType.SET, seek_pos * duration,
-                Gst.SeekType.SET, duration)
+            if self.loop:
+                seek = Gst.Event.new_seek(
+                    self.playback_rate,
+                    Gst.Format.TIME,
+                    Gst.SeekFlags.SEGMENT,
+                    Gst.SeekType.SET, seek_pos * duration,
+                    Gst.SeekType.SET, duration)
+            else:
+                seek = Gst.Event.new_seek(
+                    self.playback_rate,
+                    Gst.Format.TIME,
+                    Gst.SeekFlags.NONE,
+                    Gst.SeekType.SET, seek_pos * duration,
+                    Gst.SeekType.SET, duration)
             log.debug(f"seek: {dump_gst_seek_event(seek)}")
             ok = self.gst_player.send_event(seek)
             if not ok:
