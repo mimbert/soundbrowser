@@ -11,6 +11,8 @@ from lib.prefsdialog_ui import PrefsDialog
 
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 200
+INITIAL_SCROLLTO_DELAY_MS = 200
+GOTOPATH_SCROLLTO_DELAY_MS = 200
 
 class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
@@ -37,13 +39,16 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.update_metadata_to_current_playing_message.connect(self.update_metadata_pane_to_current_playing)
         self.enable_seek_pos_updates_signal.connect(self.enable_seek_pos_updates)
         self.disable_seek_pos_updates_signal.connect(self.disable_seek_pos_updates)
-        self.initial_scrollto_timer = QtCore.QTimer()
-        self.initial_scrollto_timer.setSingleShot(True)
-        self.initial_scrollto_timer.timeout.connect(self.initial_scrollto_hack)
-        self.initial_scrollto_timer.start(200)
+        self.delayed_scrollto(INITIAL_SCROLLTO_DELAY_MS)
+
+    def delayed_scrollto(self, delay):
+        self.scrollto_timer = QtCore.QTimer()
+        self.scrollto_timer.setSingleShot(True)
+        self.scrollto_timer.timeout.connect(self._trigger_delayed_scrollto)
+        self.scrollto_timer.start(delay)
 
     @QtCore.Slot()
-    def initial_scrollto_hack(self):
+    def _trigger_delayed_scrollto(self):
         self.tableView.scrollTo(self.tableView.currentIndex())
         self.treeView.scrollTo(self.treeView.currentIndex())
 
@@ -264,16 +269,18 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
             self.stop_button.setEnabled(False)
             self.seek_slider.setEnabled(False)
 
-    def goto_path(self, path):
+    def goto_path(self, path, delay_scrollto=False):
         directory, filename = split_path_filename(path)
         if directory:
             self.treeView.setCurrentIndex(self.fs_model.index(directory))
             self.treeView.expand(self.fs_model.index(directory))
-            self.treeView.scrollTo(self.fs_model.index(directory))
+            if not delay_scrollto:
+                self.treeView.scrollTo(self.fs_model.index(directory))
             config['last_path'] = directory
             if filename:
                 self.tableView.setRootIndex(self.dir_proxy_model.mapFromSource(self.dir_model.index(directory)))
                 self.tableView.selectRow(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)).row())
+                self.locationBar.setText(path)
                 fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
                 previous_current_sound_selected = self.current_sound_selected
                 self.current_sound_selected = self.manager.get(path)
@@ -284,12 +291,15 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                     self.update_metadata_pane(self.current_sound_selected.metadata)
                 else:
                     self.clear_metadata_pane()
-                self.tableView.scrollTo(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
+                if not delay_scrollto:
+                    self.tableView.scrollTo(self.dir_proxy_model.mapFromSource(self.dir_model.index(path)))
                 config['last_path'] = path
             else:
                 self.current_sound_selected = None
         else:
             self.current_sound_selected = None
+        if delay_scrollto:
+            self.delayed_scrollto(GOTOPATH_SCROLLTO_DELAY_MS)
 
     def update_metadata_field(self, field, value, force = None):
         f = getattr(self, field)
@@ -411,7 +421,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def locationBar_return_pressed(self):
-        self.goto_path(self.locationBar.text())
+        self.goto_path(self.locationBar.text(), delay_scrollto=True)
 
     @QtCore.Slot()
     def mainwin_copy(self):
@@ -420,7 +430,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def mainwin_paste(self):
-        self.goto_path(self.app.clipboard().text())
+        self.goto_path(self.app.clipboard().text(), delay_scrollto=True)
 
     @QtCore.Slot()
     def copy_path_clicked(self, checked = False):
@@ -429,7 +439,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def paste_path_clicked(self, checked = False):
-        self.goto_path(self.app.clipboard().text())
+        self.goto_path(self.app.clipboard().text(), delay_scrollto=True)
 
     def tableView_contextMenuEvent(self, event):
         index = self.tableView.indexAt(event.pos())
