@@ -109,6 +109,9 @@ NON-goals:
 
 MIT license
 
+DigitalNumbers font Copyright (c) 2015, Stephan Ahlf, licensed under the SIL
+Open Font License
+
 ## Dependencies
 
 * gstreamer, qt, python3, pyside2
