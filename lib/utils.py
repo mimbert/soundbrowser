@@ -33,25 +33,16 @@ def _get_milliseconds_suffix(secs):
         ms_suffix = ".%03i" % msecs
     return ms_suffix
 
-def format_duration(nsecs):
+def format_duration(nsecs, showms=True):
     if nsecs == None:
-        return ''
+        return '?'
     secs = nsecs / 1e9
-    formatted_duration = ""
-    if secs < 0:
-        secs = -secs
-        formatted_duration += "-"
     s = secs
-    d = (s - (s % 86400)) // 86400
-    s -= d * 86400
     h = (s - (s % 3600)) // 3600
     s -= h * 3600
     m = (s - (s % 60)) // 60
     s -= m * 60
-    if secs >= 86400: formatted_duration += "%id" % d
-    if secs >= 3600: formatted_duration += "%ih" % h
-    if secs >= 60: formatted_duration += "%im" % m
-    formatted_duration += "%i%ss" % (s, _get_milliseconds_suffix(s))
+    formatted_duration = f"{int(h) + ':' if h > 0 else ''}{int(m):02}:{int(s):02}{_get_milliseconds_suffix(s) if showms else ''}"
     return formatted_duration
 
 def split_path_filename(s):

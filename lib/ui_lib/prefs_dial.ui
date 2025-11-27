@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>640</width>
-    <height>508</height>
+    <height>534</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,7 +30,7 @@
    <property name="geometry">
     <rect>
      <x>450</x>
-     <y>470</y>
+     <y>500</y>
      <width>181</width>
      <height>27</height>
     </rect>
@@ -546,6 +546,29 @@ details</string>
    </property>
    <property name="text">
     <string>Reset tune on sound change</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_2">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>490</y>
+     <width>431</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <weight>50</weight>
+     <italic>true</italic>
+     <bold>false</bold>
+    </font>
+   </property>
+   <property name="text">
+    <string>DigitalNumbers font Copyright (c) 2015, Stephan Ahlf, licensed under the SIL Open Font License</string>
+   </property>
+   <property name="wordWrap">
+    <bool>true</bool>
    </property>
   </widget>
  </widget>

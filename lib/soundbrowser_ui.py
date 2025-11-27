@@ -209,6 +209,12 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.pause_icon = QtGui.QIcon(":/icons/pause.png")
         self.play_icon = QtGui.QIcon(":/icons/play.png")
         self.play_icon.addFile(":/icons/play_disabled.png", mode=QtGui.QIcon.Disabled)
+        self.fontDatabase=QtGui.QFontDatabase()
+        lcd_font_id = self.fontDatabase.addApplicationFont(':/fonts/DigitalNumbers-Regular.ttf')
+        lcd_font_family = QtGui.QFontDatabase.applicationFontFamilies(lcd_font_id)[0]
+        lcd_font = QtGui.QFont(lcd_font_family, 9)
+        self.position.setFont(lcd_font)
+        self.total.setFont(lcd_font)
         self.refresh_config()
         if config['main_window_geometry']:
             self.restoreGeometry(QtCore.QByteArray(config['main_window_geometry']))
@@ -532,7 +538,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     def slider_move(self, mouse_event):
         slider_value = self.get_slider_pos(mouse_event)
-        self.seek_slider.setValue(slider_value)
+        self.seek_slider_setvalue(slider_value)
         if self.player.player_state in [ PlayerStates.PLAYING, PlayerStates.PAUSED ]:
             self.seek(slider_value / 100.0)
         else:
@@ -547,6 +553,14 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     # ------------------------------------------------------------------------
     # sound position update
 
+    def seek_slider_setvalue(self, value, position=None, duration=None):
+        self.seek_slider.setValue(value)
+        if not position or not duration:
+            duration, position = self.player.get_duration_position()
+        self.seek_slider.setToolTip(f"{format_duration(position, showms=False)}/{format_duration(duration, showms=False)}")
+        self.position.setText(format_duration(position, showms=False))
+        self.total.setText(format_duration(duration, showms=False))
+
     @QtCore.Slot()
     def seek_position_updater(self):
         duration, position = self.player.get_duration_position()
@@ -556,7 +570,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
                 self.update_metadata_pane(self.current_sound_playing.metadata)
             if position:
                 signals_blocked = self.seek_slider.blockSignals(True)
-                self.seek_slider.setValue(position * 100.0 / duration)
+                self.seek_slider_setvalue(position * 100.0 / duration, position, duration)
                 self.seek_slider.blockSignals(signals_blocked)
 
     @QtCore.Slot()
@@ -623,5 +637,5 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def stop(self):
         log.debug(brightcyan(f"STOP"))
         self.player.stop()
-        self.seek_slider.setValue(0.0)
+        self.seek_slider_setvalue(0.0)
 

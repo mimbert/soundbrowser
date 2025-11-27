@@ -8,9 +8,10 @@
     <file>pause.png</file>
     <file>play.png</file>
     <file>stop.png</file>
-  </qresource>
-  <qresource prefix="icons">
     <file>appicon.png</file>
     <file>settings.png</file>
+  </qresource>
+  <qresource prefix="fonts">
+    <file>DigitalNumbers-Regular.ttf</file>
   </qresource>
 </RCC>
