@@ -412,9 +412,15 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def tableview_selection_changed(self, selected, deselected):
         if len(selected) == 1:
-            self.goto_path(self.tableview_get_path(self.tableView.currentIndex()))
-        if self.in_keyboard_press_event and config['autoplay_keyboard']:
-            self.tableView_return_pressed(change_dir=False)
+            fileinfo = self.dir_model.fileInfo(self.dir_proxy_model.mapToSource(self.tableView.currentIndex()))
+            if fileinfo.isFile():
+                self.goto_path(self.tableview_get_path(self.tableView.currentIndex()))
+                if self.in_keyboard_press_event and config['autoplay_keyboard']:
+                    self.tableView_return_pressed(change_dir=False)
+            else:
+                self.stop()
+                self.current_sound_selected = None
+                self.clear_metadata_pane()
 
     def tableview_keyPressEvent(self, event):
         self.in_keyboard_press_event = True
