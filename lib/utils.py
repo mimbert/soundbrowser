@@ -46,14 +46,12 @@ class LRU(collections.OrderedDict):
             log.debug(f"LRU max size, removing {oldest}")
             del self[oldest]
 
-def _get_milliseconds_suffix(secs):
-    ms_suffix = ""
-    msecs = int (round(secs - int(secs), 3) * 1000)
-    if msecs != 0:
-        ms_suffix = ".%03i" % msecs
-    return ms_suffix
+def _get_centiseconds_suffix(secs):
+    csecs = int (round(secs - int(secs), 2) * 100)
+    cs_suffix = ".%02i" % csecs
+    return cs_suffix
 
-def format_duration(nsecs, showms=True):
+def format_duration(nsecs, showcs=True):
     if nsecs == None:
         return '?'
     secs = nsecs / 1e9
@@ -62,7 +60,12 @@ def format_duration(nsecs, showms=True):
     s -= h * 3600
     m = (s - (s % 60)) // 60
     s -= m * 60
-    formatted_duration = f"{int(h) + ':' if h > 0 else ''}{int(m):02}:{int(s):02}{_get_milliseconds_suffix(s) if showms else ''}"
+    if h == 0 and m == 0:
+        formatted_duration = f"{int(s):02}{_get_centiseconds_suffix(s)}"
+    elif h == 0:
+        formatted_duration = f"{m:02}:{int(s):02}{_get_centiseconds_suffix(s) if showcs else ''}"
+    else:
+        formatted_duration = f"{h}:{m:02}:{int(s):02}{_get_centiseconds_suffix(s) if showcs else ''}"
     return formatted_duration
 
 def split_path_filename(s):

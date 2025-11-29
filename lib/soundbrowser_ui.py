@@ -583,9 +583,9 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.seek_slider.setValue(value)
         if not position or not duration:
             duration, position = self.player.get_duration_position()
-        self.seek_slider.setToolTip(f"{format_duration(position, showms=False)}/{format_duration(duration, showms=False)}")
-        self.position.setText(format_duration(position, showms=False))
-        self.total.setText(format_duration(duration, showms=False))
+        self.seek_slider.setToolTip(f"{format_duration(position, showcs=False)}/{format_duration(duration, showcs=False)}")
+        self.position.setText(format_duration(position, showcs=False))
+        self.total.setText(format_duration(duration, showcs=False))
 
     @QtCore.Slot()
     def seek_position_updater(self):
