@@ -12,7 +12,7 @@ clean:
 	find . -type f -name '*.pyc' -exec rm -rf {} +
 
 dist: clean all
-	rsync -am --delete --include='*.py' --include='*.png' --exclude='build/' --include='*/' --exclude='*' . build/
+	rsync -am --delete --include='*.py' --exclude='build/' --include='*/' --exclude='*' . build/
 	mv build/soundbrowser.py build/__main__.py
 	cd build && zip -0r ../soundbrowser.zip *
 	echo '#!/usr/bin/env python3' | cat - soundbrowser.zip > soundbrowser
