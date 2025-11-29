@@ -109,8 +109,13 @@ NON-goals:
 
 MIT license
 
-DigitalNumbers font Copyright (c) 2015, Stephan Ahlf, licensed under the SIL
-Open Font License
+DigitalNumbers font copyright (c) 2015, Stephan Ahlf
+(https://github.com/s-a/digital-numbers-font
+stephan.ahlf@googlemail.com), licensed under the SIL Open Font
+License, Version 1.1.
+
+icons from gnome adwaita icon theme
+https://download.gnome.org/sources/adwaita-icon-theme/3.38/
 
 ## Dependencies
 

@@ -15,7 +15,7 @@
   </property>
   <property name="windowIcon">
    <iconset resource="soundbrowser.qrc">
-    <normaloff>:/icons/appicon.png</normaloff>:/icons/appicon.png</iconset>
+    <normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/devices/audio-headphones-symbolic.symbolic.png</normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/devices/audio-headphones-symbolic.symbolic.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
@@ -72,7 +72,7 @@ Shortcut: Ctrl-C</string>
            </property>
            <property name="icon">
             <iconset resource="soundbrowser.qrc">
-             <normaloff>:/icons/copy.png</normaloff>:/icons/copy.png</iconset>
+             <normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/edit-copy-symbolic.symbolic.png</normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/edit-copy-symbolic.symbolic.png</iconset>
            </property>
           </widget>
          </item>
@@ -87,7 +87,7 @@ Shortcut: Ctrl-V</string>
            </property>
            <property name="icon">
             <iconset resource="soundbrowser.qrc">
-             <normaloff>:/icons/paste.png</normaloff>:/icons/paste.png</iconset>
+             <normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/edit-paste-symbolic.symbolic.png</normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/edit-paste-symbolic.symbolic.png</iconset>
            </property>
           </widget>
          </item>
@@ -878,8 +878,8 @@ Shortcut: Enter/Spacebar</string>
             </property>
             <property name="icon">
              <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/play.png</normaloff>
-              <disabledoff>:/icons/play_disabled.png</disabledoff>:/icons/play.png</iconset>
+              <normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.png</normaloff>
+              <disabledoff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.disabled.png</disabledoff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.png</iconset>
             </property>
            </widget>
           </item>
@@ -897,8 +897,8 @@ Shortcut: ESC</string>
             </property>
             <property name="icon">
              <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/stop.png</normaloff>
-              <disabledoff>:/icons/stop_disabled.png</disabledoff>:/icons/stop.png</iconset>
+              <normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-stop-symbolic.symbolic.png</normaloff>
+              <disabledoff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-stop-symbolic.symbolic.disabled.png</disabledoff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-stop-symbolic.symbolic.png</iconset>
             </property>
            </widget>
           </item>
@@ -912,7 +912,7 @@ Shortcut: ESC</string>
             </property>
             <property name="icon">
              <iconset resource="soundbrowser.qrc">
-              <normaloff>:/icons/settings.png</normaloff>:/icons/settings.png</iconset>
+              <normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/emblems/emblem-system-symbolic.symbolic.png</normaloff>:/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/emblems/emblem-system-symbolic.symbolic.png</iconset>
             </property>
             <property name="iconSize">
              <size>

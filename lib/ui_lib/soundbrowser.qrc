@@ -1,17 +1,18 @@
 <RCC>
   <qresource prefix="icons">
-    <file>paste.png</file>
-    <file>pause_disabled.png</file>
-    <file>stop_disabled.png</file>
-    <file>play_disabled.png</file>
-    <file>copy.png</file>
-    <file>pause.png</file>
-    <file>play.png</file>
-    <file>stop.png</file>
-    <file>appicon.png</file>
-    <file>settings.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/status/dialog-warning-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/emblems/emblem-system-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/devices/audio-headphones-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/edit-copy-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/edit-paste-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-pause-symbolic.symbolic.disabled.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-pause-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.disabled.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-stop-symbolic.symbolic.disabled.png</file>
+    <file>icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-stop-symbolic.symbolic.png</file>
   </qresource>
   <qresource prefix="fonts">
-    <file>DigitalNumbers-Regular.ttf</file>
+    <file>fonts/DigitalNumbers-Regular/DigitalNumbers-Regular.ttf</file>
   </qresource>
 </RCC>
