@@ -45,6 +45,10 @@ Configuration Dialog
 
   * m : toggle display of metadata pane
 
+  * ctrl-r : reset sound player
+
+  * f5 : scroll to selected directory and file if needed
+
   * mouse right-click : context menu to reload a sound
 
 ## Command line options

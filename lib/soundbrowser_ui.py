@@ -64,11 +64,11 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     def delayed_scrollto(self, delay):
         self.scrollto_timer = QtCore.QTimer()
         self.scrollto_timer.setSingleShot(True)
-        self.scrollto_timer.timeout.connect(self._trigger_delayed_scrollto)
+        self.scrollto_timer.timeout.connect(self.scrollto)
         self.scrollto_timer.start(delay)
 
     @QtCore.Slot()
-    def _trigger_delayed_scrollto(self):
+    def scrollto(self):
         self.tableView.scrollTo(self.tableView.currentIndex())
         self.treeView.scrollTo(self.treeView.currentIndex())
 
@@ -262,6 +262,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         play_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space), self)
         stop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
         reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_R), self)
+        scrollto_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F5), self)
         loop_shortcut.activated.connect(self.loop_shortcut_activated)
         metadata_shortcut.activated.connect(self.metadata_shortcut_activated)
         hidden_shortcut.activated.connect(self.hidden_shortcut_activated)
@@ -269,6 +270,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         play_shortcut.activated.connect(self.play_shortcut_activated)
         stop_shortcut.activated.connect(self.stop_shortcut_activated)
         reset_shortcut.activated.connect(self.reset_shortcut_activated)
+        scrollto_shortcut.activated.connect(self.scrollto)
         self.copy_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Copy), self)
         self.copy_shortcut.activated.connect(self.mainwin_copy)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
