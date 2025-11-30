@@ -47,8 +47,8 @@ class LRU(collections.OrderedDict):
             del self[oldest]
 
 def _get_centiseconds_suffix(secs):
-    csecs = int (round(secs - int(secs), 2) * 100)
-    cs_suffix = ".%02i" % csecs
+    csecs = int((secs - int(secs)) * 100)
+    cs_suffix = f".{csecs:02}"
     return cs_suffix
 
 def format_duration(nsecs, showcs=True):
@@ -56,9 +56,9 @@ def format_duration(nsecs, showcs=True):
         return '?'
     secs = nsecs / 1e9
     s = secs
-    h = (s - (s % 3600)) // 3600
+    h = int((s - (s % 3600)) // 3600)
     s -= h * 3600
-    m = (s - (s % 60)) // 60
+    m = int((s - (s % 60)) // 60)
     s -= m * 60
     if h == 0 and m == 0:
         formatted_duration = f"{int(s):02}{_get_centiseconds_suffix(s)}"
