@@ -1,2 +1,2 @@
 #!/bin/bash
-exec qtchooser -run-tool=designer -qt=5 "$(dirname "$0")/main_win.ui" "$(dirname "$0")/prefs_dial.ui"
+exec qtchooser -run-tool=designer -qt=5 "$(dirname "$0")/main_win.ui" "$(dirname "$0")/prefs_dial.ui" "$(dirname "$0")/help_dial.ui"

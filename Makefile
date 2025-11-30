@@ -1,4 +1,4 @@
-all: lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/soundbrowser_rc.py
+all: lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/help_dial.py lib/ui_lib/soundbrowser_rc.py
 
 lib/ui_lib/%.py: lib/ui_lib/%.ui lib/ui_lib/soundbrowser_rc.py
 	qtchooser -run-tool=uic -qt=5 $< -g python --from-imports > $@
@@ -7,7 +7,7 @@ lib/ui_lib/soundbrowser_rc.py: lib/ui_lib/soundbrowser.qrc lib/ui_lib/icons/adwa
 	qtchooser -run-tool=rcc -qt=5 $< -g python > $@
 
 clean:
-	rm -rf lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
+	rm -rf lib/ui_lib/main_win.py lib/ui_lib/prefs_dial.py lib/ui_lib/help_dial.py lib/ui_lib/soundbrowser_rc.py build/ soundbrowser soundbrowser.zip
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name '*.pyc' -exec rm -rf {} +
 

@@ -3,6 +3,7 @@ __pycache__/
 lib/ui_lib/soundbrowser_rc.py
 lib/ui_lib/main_win.py
 lib/ui_lib/prefs_dial.py
+lib/ui_lib/help_dial.py
 build/
 soundbrowser
 .vagrant

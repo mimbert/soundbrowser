@@ -28,6 +28,7 @@ from PySide2 import QtCore, QtGui, QtWidgets
 from lib.ui_lib import main_win
 from lib.ui_utils import set_pixmap, set_dark_theme, SbQFileSystemModel, SbQSortFilterProxyModel
 from lib.prefsdialog_ui import PrefsDialog
+from lib.helpdialog_ui import HelpDialog
 
 SEEK_POS_UPDATER_INTERVAL_MS = 50
 SEEK_MIN_INTERVAL_MS = 200
@@ -263,6 +264,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         stop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
         reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_R), self)
         scrollto_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F5), self)
+        help_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F1), self)
         loop_shortcut.activated.connect(self.loop_shortcut_activated)
         metadata_shortcut.activated.connect(self.metadata_shortcut_activated)
         hidden_shortcut.activated.connect(self.hidden_shortcut_activated)
@@ -271,6 +273,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         stop_shortcut.activated.connect(self.stop_shortcut_activated)
         reset_shortcut.activated.connect(self.reset_shortcut_activated)
         scrollto_shortcut.activated.connect(self.scrollto)
+        help_shortcut.activated.connect(self.show_help)
         self.copy_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Copy), self)
         self.copy_shortcut.activated.connect(self.mainwin_copy)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
@@ -280,6 +283,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.tune_value.setText('0')
         self.tune_dial.valueChanged.connect(self.tune_dial_valueChanged)
         self.preference_dialog = PrefsDialog(self)
+        self.help_dialog = HelpDialog(self)
         self.clear_metadata_pane()
         self.tableView.setFocus()
         self.player.semitone = int(self.tune_value.text())
@@ -519,6 +523,10 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def reset_shortcut_activated(self):
         self.reset_button.click()
+
+    @QtCore.Slot()
+    def show_help(self):
+        self.help_dialog.exec_()
 
     @QtCore.Slot()
     def loop_clicked(self, checked = False):

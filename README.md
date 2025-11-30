@@ -49,6 +49,8 @@ Configuration Dialog
 
   * f5 : scroll to selected directory and file if needed
 
+  * f1 : help
+
   * mouse right-click : context menu to reload a sound
 
 ## Command line options
