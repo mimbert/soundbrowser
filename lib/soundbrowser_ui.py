@@ -226,6 +226,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.paste_path_button.clicked.connect(self.paste_path_clicked)
         self.play_button.clicked.connect(self.play_clicked)
         self.stop_button.clicked.connect(self.stop_clicked)
+        self.reset_button.clicked.connect(self.reset_clicked)
         self.pause_icon = QtGui.QIcon(":/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-pause-symbolic.symbolic.png")
         self.play_icon = QtGui.QIcon(":/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.png")
         self.play_icon.addFile(":/icons/icons/adwaita-icon-theme-3.38.0/Adwaita/64x64/actions/media-playback-start-symbolic.symbolic.disabled.png", mode=QtGui.QIcon.Disabled)
@@ -260,12 +261,14 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         filter_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F), self)
         play_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space), self)
         stop_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
+        reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_R), self)
         loop_shortcut.activated.connect(self.loop_shortcut_activated)
         metadata_shortcut.activated.connect(self.metadata_shortcut_activated)
         hidden_shortcut.activated.connect(self.hidden_shortcut_activated)
         filter_shortcut.activated.connect(self.filter_shortcut_activated)
         play_shortcut.activated.connect(self.play_shortcut_activated)
         stop_shortcut.activated.connect(self.stop_shortcut_activated)
+        reset_shortcut.activated.connect(self.reset_shortcut_activated)
         self.copy_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Copy), self)
         self.copy_shortcut.activated.connect(self.mainwin_copy)
         self.paste_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtGui.QKeySequence.Paste), self)
@@ -512,6 +515,10 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.stop_button.click()
 
     @QtCore.Slot()
+    def reset_shortcut_activated(self):
+        self.reset_button.click()
+
+    @QtCore.Slot()
     def loop_clicked(self, checked = False):
         config['play_looped'] = checked
         self.stop()
@@ -535,7 +542,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def play_clicked(self, checked):
-        if self.player.player_state in [ PlayerStates.STOPPED, PlayerStates.PAUSED ] :
+        if self.player.player_state in [ PlayerStates.UNKNOWN, PlayerStates.STOPPED, PlayerStates.PAUSED ] :
             self.play()
         else:
             self.pause()
@@ -543,6 +550,10 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
     @QtCore.Slot()
     def stop_clicked(self, checked):
         self.stop()
+
+    @QtCore.Slot()
+    def reset_clicked(self, checked):
+        self.reset()
 
     def get_slider_pos(self, mouse_event):
         return QtWidgets.QStyle.sliderValueFromPosition(self.seek_slider.minimum(), self.seek_slider.maximum(), mouse_event.pos().x(), self.seek_slider.geometry().width())
@@ -666,3 +677,10 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.stop()
         self.seek_slider_setvalue(0.0)
 
+    def reset(self):
+        log.debug(brightcyan(f"RESET"))
+        self.player.reset()
+        self.seek_slider_setvalue(0.0)
+        self.configure_audio_output()
+        if self.current_sound_selected:
+            self.current_sound_selected = self.manager.get(self.current_sound_selected.path, force_reload=True)

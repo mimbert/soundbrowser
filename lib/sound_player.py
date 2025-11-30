@@ -817,7 +817,7 @@ class SoundPlayer():
         log.debug(warmyellow(f"reset"))
         with self._lock:
             self.post_player_message(PlayerMessages.RESET)
-            self.wait_player_state((PlayerStates.UNKNOWN, PlayerStates.ERROR))
+            self.wait_player_state((PlayerStates.UNKNOWN,))
             if SLEEP_HACK_TIME > 0:
                 time.sleep(SLEEP_HACK_TIME)
 
