@@ -280,6 +280,7 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.player.semitone = int(self.tune_value.text())
         self.player.loop = self.loop_button.isChecked()
         self.goto_path(startup_path)
+        self.update_ui_to_selection()
 
     def showEvent(self, event):
         self.image.setFixedWidth(self.metadata.height())
