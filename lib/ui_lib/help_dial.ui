@@ -58,6 +58,8 @@ m : toggle display of metadata pane
     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
    </property>
   </widget>
+  <zorder>label</zorder>
+  <zorder>buttonBox</zorder>
  </widget>
  <resources/>
  <connections>

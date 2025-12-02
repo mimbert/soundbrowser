@@ -554,6 +554,41 @@ details</string>
     <string>Reset tune on sound change</string>
    </property>
   </widget>
+  <zorder>startup_path_mode_current_dir</zorder>
+  <zorder>startup_path_mode_home_dir</zorder>
+  <zorder>startup_path_mode_specified_path</zorder>
+  <zorder>specified_path</zorder>
+  <zorder>startup_path_mode_last_path</zorder>
+  <zorder>specified_path_button</zorder>
+  <zorder>label_startup_directory</zorder>
+  <zorder>label_file_extensions_filter</zorder>
+  <zorder>file_extensions_filter</zorder>
+  <zorder>label_gst_aa</zorder>
+  <zorder>audio_output</zorder>
+  <zorder>audio_output_properties</zorder>
+  <zorder>label_aa_properties</zorder>
+  <zorder>label_gst_aa_details</zorder>
+  <zorder>label_aa_long_name</zorder>
+  <zorder>label_aa_description</zorder>
+  <zorder>label_aa_plugin</zorder>
+  <zorder>label_aa_plugin_description</zorder>
+  <zorder>label_aa_plugin_package</zorder>
+  <zorder>audio_output_long_name</zorder>
+  <zorder>audio_output_description</zorder>
+  <zorder>audio_output_plugin</zorder>
+  <zorder>audio_output_plugin_description</zorder>
+  <zorder>audio_output_plugin_package</zorder>
+  <zorder>check_autoplay_mouse</zorder>
+  <zorder>check_autoplay_keyboard</zorder>
+  <zorder>line</zorder>
+  <zorder>line_2</zorder>
+  <zorder>line_3</zorder>
+  <zorder>line_4</zorder>
+  <zorder>label</zorder>
+  <zorder>check_dark_theme</zorder>
+  <zorder>check_hide_tune</zorder>
+  <zorder>check_reset_tune_between_sounds</zorder>
+  <zorder>buttonBox</zorder>
  </widget>
  <resources>
   <include location="soundbrowser.qrc"/>
