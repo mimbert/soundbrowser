@@ -113,14 +113,15 @@ NON-goals:
 
 ## License
 
-MIT license
+SoundBrowser, by Matthieu Imbert, released under MIT license
+https://github.com/mimbert/soundbrowser
 
 DigitalNumbers font copyright (c) 2015, Stephan Ahlf
 (https://github.com/s-a/digital-numbers-font
 stephan.ahlf@googlemail.com), licensed under the SIL Open Font
-License, Version 1.1.
+License, Version 1.1
 
-icons from gnome adwaita icon theme
+Icons from gnome adwaita icon theme
 https://download.gnome.org/sources/adwaita-icon-theme/3.38/
 
 ## Dependencies

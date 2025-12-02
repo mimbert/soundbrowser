@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>640</width>
-    <height>534</height>
+    <width>641</width>
+    <height>624</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,7 +30,7 @@
    <property name="geometry">
     <rect>
      <x>450</x>
-     <y>500</y>
+     <y>590</y>
      <width>181</width>
      <height>27</height>
     </rect>
@@ -493,9 +493,9 @@ details</string>
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>470</y>
-     <width>441</width>
-     <height>21</height>
+     <y>460</y>
+     <width>621</width>
+     <height>151</height>
     </rect>
    </property>
    <property name="font">
@@ -506,7 +506,13 @@ details</string>
     </font>
    </property>
    <property name="text">
-    <string>SoundBrowser, by Matthieu Imbert, released under MIT license</string>
+    <string>SoundBrowser, by Matthieu Imbert, released under MIT license &lt;a href=&quot;https://github.com/mimbert/soundbrowser&quot;&gt;https://github.com/mimbert/soundbrowser&lt;/a&gt;&lt;br/&gt;DigitalNumbers font copyright (c) 2015, Stephan Ahlf (&lt;a href=&quot;https://github.com/s-a/digital-numbers-font&quot;&gt;https://github.com/s-a/digital-numbers-font&lt;/a&gt; stephan.ahlf@googlemail.com), licensed under the SIL Open Font License, Version 1.1&lt;br/&gt;Icons from gnome adwaita icon theme &lt;a href=&quot;https://download.gnome.org/sources/adwaita-icon-theme/3.38/&quot;&gt;https://download.gnome.org/sources/adwaita-icon-theme/3.38/&lt;/a&gt;</string>
+   </property>
+   <property name="textFormat">
+    <enum>Qt::RichText</enum>
+   </property>
+   <property name="wordWrap">
+    <bool>true</bool>
    </property>
   </widget>
   <widget class="QCheckBox" name="check_dark_theme">
@@ -546,29 +552,6 @@ details</string>
    </property>
    <property name="text">
     <string>Reset tune on sound change</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_2">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>490</y>
-     <width>431</width>
-     <height>41</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <weight>50</weight>
-     <italic>true</italic>
-     <bold>false</bold>
-    </font>
-   </property>
-   <property name="text">
-    <string>DigitalNumbers font Copyright (c) 2015, Stephan Ahlf, licensed under the SIL Open Font License</string>
-   </property>
-   <property name="wordWrap">
-    <bool>true</bool>
    </property>
   </widget>
  </widget>
