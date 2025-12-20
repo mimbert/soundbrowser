@@ -639,21 +639,8 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.next_seek_pos = None
         self.seek_min_interval_timer = None
 
-    def seek(self, seek_pos):
-        # 0 <= seek_pos <= 1.0
-        if self.seek_min_interval_timer != None:
-            log.debug(f"seek to {seek_pos} delayed to limit gst seek events frequency")
-            self.next_seek_pos = seek_pos
-        else:
-            self.player.seek(seek_pos)
-            self.next_seek_pos = None
-            self.seek_min_interval_timer = QtCore.QTimer()
-            self.seek_min_interval_timer.setSingleShot(True)
-            self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
-            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
-
     # ------------------------------------------------------------------------
-    # play / pause / stop
+    # play / pause / stop / seek
 
     def play(self, start_pos=0):
         # 0 <= start_pos <= 1.0
@@ -694,3 +681,17 @@ class SoundBrowserUI(main_win.Ui_MainWindow, QtWidgets.QMainWindow):
         self.configure_audio_output()
         if self.current_sound_selected:
             self.current_sound_selected = self.manager.get(self.current_sound_selected.path, force_reload=True)
+
+    def seek(self, seek_pos):
+        # 0 <= seek_pos <= 1.0
+        log.debug(brightcyan(f"SEEK {seek_pos}"))
+        if self.seek_min_interval_timer != None:
+            log.debug(f"seek to {seek_pos} delayed to limit gst seek events frequency")
+            self.next_seek_pos = seek_pos
+        else:
+            self.player.seek(seek_pos)
+            self.next_seek_pos = None
+            self.seek_min_interval_timer = QtCore.QTimer()
+            self.seek_min_interval_timer.setSingleShot(True)
+            self.seek_min_interval_timer.timeout.connect(self.seek_min_interval_timer_fired)
+            self.seek_min_interval_timer.start(SEEK_MIN_INTERVAL_MS)
