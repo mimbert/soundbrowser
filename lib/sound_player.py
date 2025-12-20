@@ -714,7 +714,7 @@ class SoundPlayer():
         return f"gst_msg={dump_gst_message(args.gst_msg)} player_msg={dump_player_message(args.player_msg) if args.player_msg else args.player_msg}"
 
     def log_state_machine_error(self, args):
-        log.error(f"sound player state machine error: current_state={self.player_state} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
+        log.error(f"sound player state machine error: current_state={self.player_state.name} function={inspect.stack()[1][3]} {self.dump_state_machine_args(args)}")
         log_callstack()
 
     def wait_player_state(self, player_states):
@@ -769,11 +769,11 @@ class SoundPlayer():
                     # change, which instanciate a new "state
                     # transition" generator and will notify the state
                     # change cond var
-                    log.debug(brightgreen(f"player state change from {self.player_state} to {new_player_state}"))
+                    log.debug(brightgreen(f"player state change from {self.player_state.name} to {new_player_state.name}"))
                     self.__change_player_state(new_player_state)
-                    log.debug(brightgreen(f"new player state {self.player_state}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
+                    log.debug(brightgreen(f"new player state {self.player_state.name}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
                 else:
-                    log.debug(brightgreen(f"player state stays {self.player_state}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
+                    log.debug(brightgreen(f"player state stays {self.player_state.name}/{self._player_state_handler.gi_code.co_name}:{self._player_state_handler.gi_frame.f_lineno}"))
         return True
 
     # ------------------------------------------------------------------------
