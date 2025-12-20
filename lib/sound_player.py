@@ -831,7 +831,8 @@ class SoundPlayer():
             elif self.player_state == PlayerStates.PAUSED:
                 seek_flags = Gst.SeekFlags.FLUSH
             else:
-                log.warn(f"trying to seek from state {self.player_state.name}")
+                log.error(f"trying to seek from state {self.player_state.name}")
+                return
             if self.loop:
                 seek_flags = seek_flags | Gst.SeekFlags.SEGMENT
                 seek = Gst.Event.new_seek(
