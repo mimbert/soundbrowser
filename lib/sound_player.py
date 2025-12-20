@@ -826,18 +826,25 @@ class SoundPlayer():
         log.debug(warmyellow(f"seek seek_pos={seek_pos}"))
         got_duration, duration = self.gst_player.query_duration(Gst.Format.TIME)
         if got_duration:
+            if self.player_state == PlayerStates.PLAYING:
+                seek_flags = Gst.SeekFlags.NONE
+            elif self.player_state == PlayerStates.PAUSED:
+                seek_flags = Gst.SeekFlags.FLUSH
+            else:
+                log.warn(f"trying to seek from state {self.player_state.name}")
             if self.loop:
+                seek_flags = seek_flags | Gst.SeekFlags.SEGMENT
                 seek = Gst.Event.new_seek(
                     self.playback_rate,
                     Gst.Format.TIME,
-                    Gst.SeekFlags.SEGMENT,
+                    seek_flags,
                     Gst.SeekType.SET, seek_pos * duration,
                     Gst.SeekType.SET, duration)
             else:
                 seek = Gst.Event.new_seek(
                     self.playback_rate,
                     Gst.Format.TIME,
-                    Gst.SeekFlags.NONE,
+                    seek_flags,
                     Gst.SeekType.SET, seek_pos * duration,
                     Gst.SeekType.SET, duration)
             log.debug(f"seek: {dump_gst_seek_event(seek)}")
